@@ -22,4 +22,8 @@ return [
     |
     */
     'model' => \Meridaura\PaymentManager\Models\Payment::class,
+
+    'drivers' => [
+
+    ]
 ];

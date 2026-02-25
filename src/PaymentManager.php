@@ -7,9 +7,8 @@ use Meridaura\PaymentManager\Contracts\PaymentManagerInterface;
 
 class PaymentManager extends Manager implements PaymentManagerInterface
 {
-
-    public function getDefaultDriver()
+    public function getDefaultDriver(): string
     {
-        return null;
+        return 'тгдд';
     }
 }
