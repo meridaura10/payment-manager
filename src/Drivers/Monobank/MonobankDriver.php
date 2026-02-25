@@ -1,12 +1,14 @@
 <?php
 
-namespace Meridaura\PaymentManager\Gateways\Monobank;
+namespace Meridaura\PaymentManager\Drivers\Monobank;
 
 use Meridaura\PaymentManager\Contracts\GatewayChargeInterface;
 use Meridaura\PaymentManager\Contracts\GatewayRecurringInterface;
-use Meridaura\PaymentManager\Gateways\AbstractGateway;
+use Meridaura\PaymentManager\Contracts\SupportsChargesInterface;
+use Meridaura\PaymentManager\Contracts\SupportsRecurringInterface;
+use Meridaura\PaymentManager\Drivers\AbstractGateway;
 
-class MonobankDriver extends AbstractGateway implements GatewayRecurringInterface
+class MonobankDriver extends AbstractGateway implements SupportsChargesInterface, SupportsRecurringInterface
 {
     public function charges(): GatewayChargeInterface
     {

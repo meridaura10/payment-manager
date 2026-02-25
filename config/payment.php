@@ -24,6 +24,8 @@ return [
     'model' => \Meridaura\PaymentManager\Models\Payment::class,
 
     'drivers' => [
-
+        'monobank' => [
+            'base_url' => 'https://api.monobank.ua/api/',
+        ],
     ]
 ];

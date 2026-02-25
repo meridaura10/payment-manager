@@ -5,7 +5,7 @@ namespace Meridaura\PaymentManager;
 use Illuminate\Support\ServiceProvider;
 use Meridaura\PaymentManager\Contracts\PaymentManagerInterface;
 use Meridaura\PaymentManager\Enums\PaymentDriverEnum;
-use Meridaura\PaymentManager\Gateways\Monobank\MonobankDriver;
+use Meridaura\PaymentManager\Drivers\Monobank\MonobankDriver;
 
 class PaymentServiceProvider extends ServiceProvider
 {
@@ -19,6 +19,12 @@ class PaymentServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        $manager = $this->app->make('paymentManager');
+
+        $manager->extend(PaymentDriverEnum::MONOBANK->value, function () {
+            return new MonobankDriver(config('payment.drivers.monobank'));
+        });
+
         $this->publishConsole();
     }
 
@@ -31,12 +37,6 @@ class PaymentServiceProvider extends ServiceProvider
 
     private function publishConsole(): void
     {
-        $manager = $this->app->make('paymentManager');
-
-        $manager->extend(PaymentDriverEnum::MONOBANK->value, function () {
-            return new MonobankDriver();
-        });
-
         if ($this->app->runningInConsole()) {
             $this->publishes([
                 __DIR__.'/../config/payment.php' => config_path('payment.php'),

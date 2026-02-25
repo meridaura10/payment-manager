@@ -2,10 +2,10 @@
 
 namespace Meridaura\PaymentManager\Contracts;
 
-use Meridaura\PaymentManager\DTO\PaymentChargeRequestDTO;
-use Meridaura\PaymentManager\DTO\PaymentChargeResponseDTO;
+use Meridaura\PaymentManager\DTO\PaymentPurchaseRequestDTO;
+use Meridaura\PaymentManager\DTO\PaymentPurchaseResponseDTO;
 
 interface GatewayChargeInterface
 {
-    public function purchase(PaymentChargeRequestDTO $dataDto): PaymentChargeResponseDTO;
+    public function purchase(PaymentPurchaseRequestDTO $dataDto): PaymentPurchaseResponseDTO;
 }

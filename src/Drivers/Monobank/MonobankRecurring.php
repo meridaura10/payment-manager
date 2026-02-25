@@ -1,6 +1,6 @@
 <?php
 
-namespace Meridaura\PaymentManager\Gateways\Monobank;
+namespace Meridaura\PaymentManager\Drivers\Monobank;
 
 use Meridaura\PaymentManager\Contracts\GatewayRecurringInterface;
 

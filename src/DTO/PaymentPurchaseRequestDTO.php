@@ -2,7 +2,7 @@
 
 namespace Meridaura\PaymentManager\DTO;
 
-class PaymentChargeRequestDTO
+class PaymentPurchaseRequestDTO
 {
     public function __construct(
         readonly public string|int $orderId,
@@ -10,6 +10,7 @@ class PaymentChargeRequestDTO
         readonly public float $amount,
         readonly ?string $webHookUrl = null,
         readonly ?string $redirectUrl = null,
+        readonly ?string $description = null,
         readonly public array $driverOptions = [],
         readonly public array $headers = [],
     ) {}

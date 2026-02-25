@@ -1,12 +1,17 @@
 <?php
 
-namespace Meridaura\PaymentManager\Gateways;
+namespace Meridaura\PaymentManager\Drivers;
 
+use Illuminate\Support\Arr;
 use Meridaura\PaymentManager\Contracts\PaymentGatewayInterface;
 
 abstract class AbstractGateway implements PaymentGatewayInterface
 {
-    protected array $config = [];
+    public function __construct(
+        protected array $config = []
+    ) {
+
+    }
 
     public function setConfig(array $config): static
     {
@@ -17,6 +22,6 @@ abstract class AbstractGateway implements PaymentGatewayInterface
 
     public function getConfig(?string $key = null, mixed $default = null): mixed
     {
-        return $key ? $this->config['key'] ?? $default : $this->config;
+        return $key ? Arr::get($this->config, $key, $default) : $this->config;
     }
 }
