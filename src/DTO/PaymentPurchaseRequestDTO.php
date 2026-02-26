@@ -12,6 +12,5 @@ class PaymentPurchaseRequestDTO
         readonly ?string $redirectUrl = null,
         readonly ?string $description = null,
         readonly public array $driverOptions = [],
-        readonly public array $headers = [],
     ) {}
 }

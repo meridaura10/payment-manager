@@ -3,50 +3,66 @@
 namespace Meridaura\PaymentManager\Drivers\Monobank;
 
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 use Meridaura\PaymentManager\Contracts\GatewayChargeInterface;
 use Meridaura\PaymentManager\DTO\PaymentPurchaseRequestDTO;
 use Meridaura\PaymentManager\DTO\PaymentPurchaseResponseDTO;
+use Meridaura\PaymentManager\DTO\PaymentErrorDTO;
 use Meridaura\PaymentManager\Drivers\Monobank\Validators\MonobankPurchaseValidator;
+use Meridaura\PaymentManager\Enums\PaymentResponseStatusEnum;
 
 class MonobankCharges implements GatewayChargeInterface
 {
-    public function __construct(protected array $config = [])
-    {
-    }
+    public function __construct(
+        protected array $config = []
+    ) {}
 
     public function purchase(PaymentPurchaseRequestDTO $dataDto): PaymentPurchaseResponseDTO
     {
-        $data = MonobankPurchaseValidator::validate($dataDto, $this->config);
-
         try {
-            $response = Http::withHeaders($data['headers'])
+            $validate = (new MonobankPurchaseValidator($dataDto, $this->config))->validate();
+
+            $response = Http::withHeaders($validate['headers'])
                 ->baseUrl($this->config['base_url'])
-                ->post('merchant/invoice/create', $data['data']);
+                ->post('merchant/invoice/create', $validate['payload']);
 
+            $responseData = $response->json() ?? [];
 
-            if ($response->failed()) {
-                throw new \Exception('Monobank API Error: ' . $response->body());
+            if (!$response->successful()) {
+                return new PaymentPurchaseResponseDTO(
+                    status: PaymentResponseStatusEnum::ERROR,
+                    error: new PaymentErrorDTO(
+                        message: $responseData['errText'] ?? 'Unknown Monobank API Error',
+                        code: $responseData['errCode'] ?? 'api_error',
+                        httpStatus: $response->status(),
+                    ),
+                );
             }
 
-            $responseData = $response->json();
-
             return new PaymentPurchaseResponseDTO(
-                status: 'ok',
+                status: PaymentResponseStatusEnum::SUCCESS,
+                extern_id: $responseData['invoiceId'] ?? null,
+                page_url: $responseData['pageUrl'] ?? null,
                 system_data: $responseData,
             );
 
-        } catch (\Exception $exception) {
-            Log::error('PaymentManager [Monobank] Error: ' . $exception->getMessage(), [
-                'order_id' => $dataDto->orderId,
-                'data' => $data
-            ]);
-
+        } catch (ValidationException $exception) {
             return new PaymentPurchaseResponseDTO(
-                status: 'error',
-                errors: [
-                    'message' => $exception->getMessage(),
-                ]
+                status: PaymentResponseStatusEnum::VALIDATION_ERROR,
+                error: new PaymentErrorDTO(
+                    message: $exception->getMessage(),
+                    code: 422,
+                    validations: $exception->errors(),
+                ),
+            );
+
+        } catch (\Throwable $exception) {
+            return new PaymentPurchaseResponseDTO(
+                status: PaymentResponseStatusEnum::ERROR,
+                error: new PaymentErrorDTO(
+                    message: 'System error: ' . $exception->getMessage(),
+                    code: $exception->getCode() ?: 500,
+                ),
             );
         }
     }

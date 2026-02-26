@@ -3,30 +3,41 @@
 namespace Meridaura\PaymentManager\Drivers\Monobank\Validators;
 
 use Illuminate\Support\Facades\Validator;
-use InvalidArgumentException;
+use Illuminate\Validation\ValidationException;
 use Meridaura\PaymentManager\DTO\PaymentPurchaseRequestDTO;
 
 class MonobankPurchaseValidator
 {
-    public static function validate(PaymentPurchaseRequestDTO $dto, array $config): array
+    public function __construct(
+        protected PaymentPurchaseRequestDTO $dto,
+        protected array $config = [],
+    ) {
+
+    }
+
+    public function validate(): array
     {
+        $validConfig = $this->validateConfig();
+        $validPayload = $this->validatePayload();
+
         return [
-            'data' => static::validateData($dto, $config),
-            'headers' => static::validateHeaders($dto, $config),
+            'headers' => $this->buildHeaders($validConfig),
+            'payload' => $validPayload,
+            'config' => $validConfig,
         ];
     }
 
-    public static function validateData(PaymentPurchaseRequestDTO $dto, array $config): array
+    protected function validatePayload(): array
     {
         $data = [
-            'amount' => (int) ($dto->amount * 100),
-            'ccy' => $dto->currency,
+            'amount' => $this->dto->amount,
+            'ccy' => $this->dto->currency,
             'merchantPaymInfo' => [
-                'reference' => (string) $dto->orderId,
-                'destination' => $dto->description,
+                'reference' => (string) $this->dto->orderId,
+                'destination' => $this->dto->description ?? "Оплата замовлення #{$this->dto->orderId}",
             ],
-            'webHookUrl' => $dto->webHookUrl ?? $config['webhook_url'] ?? null,
-            'redirectUrl' => $dto->redirectUrl ?? $config['redirect_url'] ?? null,
+            'webHookUrl' => $this->dto->webHookUrl ?? $this->config['webhook_url'] ?? null,
+            'redirectUrl' => $this->dto->redirectUrl ?? $this->config['redirect_url'] ?? null,
         ];
 
         $validator = Validator::make($data, [
@@ -35,24 +46,41 @@ class MonobankPurchaseValidator
         ]);
 
         if ($validator->fails()) {
-            throw new InvalidArgumentException('Error validate monobank data:' . $validator->errors()->first());
+            throw new ValidationException($validator);
         }
 
         return $data;
     }
 
-    public static function validateHeaders(PaymentPurchaseRequestDTO $dto, array $config): array
+    protected function validateConfig(): array
     {
-        $data = $dto->headers;
-
-        $validator = Validator::make($data, [
-            'X-Token' => 'required|string',
+        $validator = Validator::make($this->config, [
+            'token' => 'required|string',
+            'cms' => 'sometimes|string',
+            'cms_version' => 'sometimes|string',
         ]);
 
         if ($validator->fails()) {
-            throw new InvalidArgumentException('Error validate monobank headers: ' . $validator->errors()->first());
+            throw new ValidationException($validator);
         }
 
-        return $data;
+        return $this->config;
+    }
+
+    protected function buildHeaders(array $config): array
+    {
+        $headers = [
+            'X-Token' => $config['token'],
+        ];
+
+        if (!empty($config['cms'])) {
+            $headers['X-Cms'] = $config['cms'];
+        }
+
+        if (!empty($config['cms_version'])) {
+            $headers['X-Cms-Version'] = $config['cms_version'];
+        }
+
+        return $headers;
     }
 }

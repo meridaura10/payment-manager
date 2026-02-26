@@ -4,7 +4,6 @@ namespace Meridaura\PaymentManager;
 
 use Closure;
 use Illuminate\Contracts\Container\Container;
-use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Meridaura\PaymentManager\Contracts\GatewayChargeInterface;
 use Meridaura\PaymentManager\Contracts\GatewayRecurringInterface;
@@ -84,12 +83,10 @@ class PaymentManager implements PaymentManagerInterface
     {
         $driver ??= $this->getDefaultDriver();
 
-        // Якщо передали кастомний конфіг - завжди будуємо свіжий об'єкт
         if (!empty($config)) {
             return $this->build($driver, $config);
         }
 
-        // Інакше беремо з кешу або створюємо
         if (!isset($this->drivers[$driver])) {
             $this->drivers[$driver] = $this->build($driver);
         }
@@ -99,18 +96,17 @@ class PaymentManager implements PaymentManagerInterface
 
     public function build(string $driver, array $config = []): PaymentGatewayInterface
     {
-        // 1. Спочатку шукаємо серед зареєстрованих через extend()
-        if (isset($this->customCreators[$driver])) {
-            return $this->customCreators[$driver]($this->container, $config);
+        if (!isset($this->customCreators[$driver])) {
+            throw new InvalidArgumentException("Payment driver [{$driver}] is not supported.");
         }
 
-        // 2. Якщо є метод всередині самого класу (наприклад createMonobankDriver)
-        $method = 'create' . Str::studly($driver) . 'Driver';
+        /* @var PaymentGatewayInterface $gateway */
+        $gateway = $this->customCreators[$driver]($this->container, $config);
 
-        if (method_exists($this, $method)) {
-            return $this->$method($config);
+        if ($config) {
+            $gateway->setConfig(array_merge($gateway->getConfig(), $config));
         }
 
-        throw new InvalidArgumentException("Payment driver [{$driver}] is not supported.");
+        return $gateway;
     }
 }

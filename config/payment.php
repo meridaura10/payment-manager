@@ -26,6 +26,7 @@ return [
     'drivers' => [
         'monobank' => [
             'base_url' => 'https://api.monobank.ua/api/',
+            'token' => 'uVEcBpvn-IBwADYbL_8meX5VX2XUTMICdXJ58-RJJ89E',
         ],
     ]
 ];
