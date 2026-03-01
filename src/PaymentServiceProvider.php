@@ -25,6 +25,10 @@ class PaymentServiceProvider extends ServiceProvider
             return new MonobankDriver(config('payment.drivers.monobank'));
         });
 
+        $manager->extend(PaymentDriverEnum::NOVAPAY->value, function ($app) {
+            return new \Meridaura\PaymentManager\Drivers\NovaPay\NovaPayDriver(config('payment.drivers.novapay'));
+        });
+
         $this->publishConsole();
     }
 
