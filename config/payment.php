@@ -3,30 +3,27 @@
 return [
     /*
     |--------------------------------------------------------------------------
-    | Дефолтний драйвер
+    | Default Payment Driver
     |--------------------------------------------------------------------------
-    |
-    | Тут вказується назва платіжного шлюзу, який буде використовуватися
-    | за замовчуванням, якщо не вказати інший явно через Payment::driver().
-    |
     */
-    'default' => env('PAYMENT_DEFAULT_DRIVER', 'dummy'),
+    'default' => env('PAYMENT_DEFAULT_DRIVER', 'monobank'),
 
     /*
     |--------------------------------------------------------------------------
-    | Модель для збереження платежів
+    | Payment Drivers Configuration
     |--------------------------------------------------------------------------
-    |
-    | Якщо пакет буде зберігати історію платежів у базу (що ми обговорювали),
-    | тут можна вказати модель основного проєкту, яка цим керує.
-    |
     */
-    'model' => \Meridaura\PaymentManager\Models\Payment::class,
-
     'drivers' => [
         'monobank' => [
-            'base_url' => 'https://api.monobank.ua/api/',
-            'token' => 'uVEcBpvn-IBwADYbL_8meX5VX2XUTMICdXJ58-RJJ89E',
+            'base_url' => env('MONOBANK_BASE_URL', 'https://api.monobank.ua/api/'),
+            'token'    => env('MONOBANK_TOKEN'),
         ],
-    ]
+
+        'novapay' => [
+            'base_url' => env('NOVAPAY_BASE_URL', 'https://api-qecom.novapay.ua/v1/'),
+            'merchant_id' => env('NOVAPAY_MERCHANT_ID'),
+            'private_key' => env('NOVAPAY_PRIVATE_KEY'),
+            'public_key' => env('NOVAPAY_PUBLIC_KEY'),
+        ]
+    ],
 ];

@@ -11,4 +11,6 @@ enum PaymentDriverEnum: string
     case STRIPE = 'stripe';
 
     case WAYFORPAY = 'wayforpay';
+
+    case NOVAPAY = 'novapay';
 }
