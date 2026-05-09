@@ -4,14 +4,13 @@ namespace Meridaura\PaymentManager\Drivers;
 
 use Illuminate\Support\Arr;
 use Meridaura\PaymentManager\Contracts\PaymentGatewayInterface;
+use Meridaura\PaymentManager\Events\PaymentMake;
+use Meridaura\PaymentManager\Models\Payment;
+use Meridaura\PaymentManager\Support\Configurator\ConfiguratorInterface;
 
-abstract class AbstractGateway implements PaymentGatewayInterface
+abstract class AbstractDriver implements PaymentGatewayInterface
 {
-    public function __construct(
-        protected array $config = []
-    ) {
-
-    }
+    protected array $config = [];
 
     public function setConfig(array $config): static
     {
@@ -24,4 +23,6 @@ abstract class AbstractGateway implements PaymentGatewayInterface
     {
         return $key ? Arr::get($this->config, $key, $default) : $this->config;
     }
+
+    abstract public static function getGatewayName(): string;
 }

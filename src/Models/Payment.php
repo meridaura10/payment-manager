@@ -2,7 +2,14 @@
 
 namespace Meridaura\PaymentManager\Models;
 
-class Payment extends AbstractPayment
-{
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\Model;
 
+class Payment extends Model
+{
+    use HasUuids;
+
+    protected $guarded = ['id'];
+
+    protected $table = 'payments';
 }

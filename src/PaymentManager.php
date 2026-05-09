@@ -5,13 +5,18 @@ namespace Meridaura\PaymentManager;
 use Closure;
 use Illuminate\Contracts\Container\Container;
 use InvalidArgumentException;
-use Meridaura\PaymentManager\Contracts\GatewayChargeInterface;
 use Meridaura\PaymentManager\Contracts\GatewayRecurringInterface;
 use Meridaura\PaymentManager\Contracts\PaymentGatewayInterface;
 use Meridaura\PaymentManager\Contracts\PaymentManagerInterface;
 use Meridaura\PaymentManager\Contracts\SupportsChargesInterface;
 use Meridaura\PaymentManager\Contracts\SupportsRecurringInterface;
+use Meridaura\PaymentManager\Contracts\SupportsWebhookInterface;
+use Meridaura\PaymentManager\Drivers\AbstractCharge;
+use Meridaura\PaymentManager\Drivers\AbstractWebhook;
 use Meridaura\PaymentManager\Exceptions\PaymentGatewayException;
+use Meridaura\PaymentManager\Models\Payment;
+use Meridaura\PaymentManager\Support\Configurator\ConfiguratorInterface;
+use Meridaura\PaymentManager\Support\PaymentRepository\PaymentRepositoryInterface;
 
 class PaymentManager implements PaymentManagerInterface
 {
@@ -25,16 +30,9 @@ class PaymentManager implements PaymentManagerInterface
      */
     protected array $customCreators = [];
 
-    /**
-     * @param Container $container Laravel IoC Container
-     */
-    public function __construct(protected Container $container)
-    {
-    }
-
-    public function getDefaultDriver(): string
-    {
-        return $this->container->make('config')->get('payment.default', 'monobank');
+    public function __construct(
+        protected Container $container,
+    ) {
     }
 
     /**
@@ -47,10 +45,23 @@ class PaymentManager implements PaymentManagerInterface
         return $this;
     }
 
+    public function webhooks(?string $driver = null, array $config = []): AbstractWebhook
+    {
+        $gateway = $this->driver($driver, $config);
+
+        if (!$gateway instanceof SupportsWebhookInterface) {
+            throw new PaymentGatewayException(
+                sprintf('Driver [%s] does not support webhook handle.', get_class($gateway))
+            );
+        }
+
+        return $gateway->webhooks();
+    }
+
     /**
      * @throws PaymentGatewayException
      */
-    public function charges(?string $driver = null, array $config = []): GatewayChargeInterface
+    public function charges(?string $driver = null, array $config = []): AbstractCharge
     {
         $gateway = $this->driver($driver, $config);
 
@@ -60,7 +71,7 @@ class PaymentManager implements PaymentManagerInterface
             );
         }
 
-        return $gateway->charges();
+        return $gateway->charges()->setGatewayName($gateway::getGatewayName());
     }
 
     /**
@@ -81,8 +92,6 @@ class PaymentManager implements PaymentManagerInterface
 
     public function driver(?string $driver = null, array $config = []): PaymentGatewayInterface
     {
-        $driver ??= $this->getDefaultDriver();
-
         if (!empty($config)) {
             return $this->build($driver, $config);
         }
@@ -94,18 +103,19 @@ class PaymentManager implements PaymentManagerInterface
         return $this->drivers[$driver];
     }
 
-    public function build(string $driver, array $config = []): PaymentGatewayInterface
+    protected function build(string $driver, array $config = []): PaymentGatewayInterface
     {
         if (!isset($this->customCreators[$driver])) {
             throw new InvalidArgumentException("Payment driver [{$driver}] is not supported.");
         }
 
-        /* @var PaymentGatewayInterface $gateway */
-        $gateway = $this->customCreators[$driver]($this->container, $config);
+        $configurator = $this->container->make(ConfiguratorInterface::class);
+        $defaultConfig = $configurator->getDriverConfig($driver);
+        $mergedConfig = array_merge($defaultConfig, $config);
 
-        if ($config) {
-            $gateway->setConfig(array_merge($gateway->getConfig(), $config));
-        }
+        /* @var PaymentGatewayInterface $gateway */
+        $gateway = $this->customCreators[$driver]($this->container, $mergedConfig);
+        $gateway->setConfig(array_merge($mergedConfig));
 
         return $gateway;
     }

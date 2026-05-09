@@ -1,0 +1,54 @@
+<?php
+
+namespace App\Providers;
+
+use Illuminate\Support\ServiceProvider;
+use Meridaura\PaymentManager\Contracts\PaymentManagerInterface;
+use Meridaura\PaymentManager\DTO\PaymentPurchaseRequestDTO;
+use Meridaura\PaymentManager\Models\Payment;
+use Meridaura\PaymentManager\Support\PaymentRepository\PaymentRepository;
+
+class PaymentManagerServiceProvider extends ServiceProvider
+{
+    public function register(): void
+    {
+        //
+    }
+
+    public function boot(): void
+    {
+        $manager = $this->getManager();
+
+        $this->configurePaymentCreation($manager);
+        $this->registerCustomDrivers($manager);
+    }
+
+    /**
+     * Налаштування логіки створення записів про платежі в БД.
+     */
+    protected function configurePaymentCreation(PaymentManagerInterface $paymentManager): void
+    {
+        $paymentManager->getPaymentRepository()->createPurchaseUsing(
+            function (PaymentPurchaseRequestDTO $dto) {
+                 return Payment::query()->firstOrCreate([
+                     'status' => 'new',
+                 ], [
+                     'amount' => $dto->amount,
+                     'currency' => $dto->currency ?? 'UAH',
+                 ]);
+            }
+        );
+    }
+
+    protected function registerCustomDrivers(PaymentManagerInterface $paymentManager): void
+    {
+         $paymentManager->extend('monobank', function ($app) {
+             // return new \App\Services\Payments\PaymentDrivers\Monobank\MonobankDriver();
+         });
+    }
+
+    private function getManager(): PaymentManagerInterface
+    {
+        return $this->app->make(PaymentManagerInterface::class);
+    }
+}

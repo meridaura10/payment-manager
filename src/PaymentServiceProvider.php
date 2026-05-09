@@ -4,47 +4,48 @@ namespace Meridaura\PaymentManager;
 
 use Illuminate\Support\ServiceProvider;
 use Meridaura\PaymentManager\Contracts\PaymentManagerInterface;
-use Meridaura\PaymentManager\Enums\PaymentDriverEnum;
-use Meridaura\PaymentManager\Drivers\Monobank\MonobankDriver;
+use Meridaura\PaymentManager\Support\Configurator\Configurator;
+use Meridaura\PaymentManager\Support\Configurator\ConfiguratorInterface;
+use Meridaura\PaymentManager\Support\PaymentRepository\PaymentRepository;
+use Meridaura\PaymentManager\Support\PaymentRepository\PaymentRepositoryInterface;
 
 class PaymentServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
         $this->app->singleton(PaymentManagerInterface::class, PaymentManager::class);
-        $this->app->alias(PaymentManagerInterface::class, 'paymentManager');
+        $this->app->singleton(ConfiguratorInterface::class, Configurator::class);
+        $this->app->singleton(PaymentRepositoryInterface::class, PaymentRepository::class);
 
         $this->publishLocal();
     }
 
     public function boot(): void
     {
-        $manager = $this->app->make('paymentManager');
-
-        $manager->extend(PaymentDriverEnum::MONOBANK->value, function () {
-            return new MonobankDriver(config('payment.drivers.monobank'));
-        });
-
-        $manager->extend(PaymentDriverEnum::NOVAPAY->value, function ($app) {
-            return new \Meridaura\PaymentManager\Drivers\NovaPay\NovaPayDriver(config('payment.drivers.novapay'));
-        });
-
         $this->publishConsole();
     }
 
     private function publishLocal(): void
     {
         $this->mergeConfigFrom(
-            __DIR__ . './../config/payment.php', 'payment'
+            __DIR__ . './../config/payment-manager.php', 'payment'
         );
     }
 
     private function publishConsole(): void
     {
         if ($this->app->runningInConsole()) {
+            $this->commands([
+                \Meridaura\PaymentManager\Console\Commands\InstallCommand::class,
+            ]);
+
             $this->publishes([
-                __DIR__.'/../config/payment.php' => config_path('payment.php'),
+                __DIR__ . '/../config/payment-manager.php' => config_path('payment-manager.php'),
             ], 'payment-config');
+
+            $this->publishes([
+                __DIR__ . '/../stubs/PaymentManagerServiceProvider.stub' => app_path('Providers/PaymentManagerServiceProvider.php'),
+            ], 'payment-provider');
         }
     }
 }
