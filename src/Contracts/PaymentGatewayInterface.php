@@ -9,4 +9,6 @@ interface PaymentGatewayInterface
     public function getConfig(?string $key, mixed $default = null): mixed;
 
     public static function getGatewayName(): string;
+
+    public function getGatewayConfig(): array;
 }

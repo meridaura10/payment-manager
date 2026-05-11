@@ -25,4 +25,9 @@ abstract class AbstractDriver implements PaymentGatewayInterface
     }
 
     abstract public static function getGatewayName(): string;
+
+    public function getGatewayConfig(): array
+    {
+        return [];
+    }
 }
