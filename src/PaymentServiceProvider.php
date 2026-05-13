@@ -6,6 +6,8 @@ use Illuminate\Support\ServiceProvider;
 use Meridaura\PaymentManager\Contracts\PaymentManagerInterface;
 use Meridaura\PaymentManager\Support\Configurator\Configurator;
 use Meridaura\PaymentManager\Support\Configurator\ConfiguratorInterface;
+use Meridaura\PaymentManager\Support\EventManager\EventManager;
+use Meridaura\PaymentManager\Support\EventManager\EventManagerInterface;
 use Meridaura\PaymentManager\Support\PaymentRepository\PaymentRepository;
 use Meridaura\PaymentManager\Support\PaymentRepository\PaymentRepositoryInterface;
 
@@ -16,6 +18,7 @@ class PaymentServiceProvider extends ServiceProvider
         $this->app->singleton(PaymentManagerInterface::class, PaymentManager::class);
         $this->app->singleton(ConfiguratorInterface::class, Configurator::class);
         $this->app->singleton(PaymentRepositoryInterface::class, PaymentRepository::class);
+        $this->app->singleton(EventManagerInterface::class, EventManager::class);
 
         $this->publishLocal();
     }

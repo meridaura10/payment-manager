@@ -3,7 +3,9 @@
 namespace Meridaura\PaymentManager\Support\PaymentRepository;
 
 use Closure;
+use Meridaura\PaymentManager\Enums\PaymentStageEnum;
 use Meridaura\PaymentManager\Models\Payment;
+use Meridaura\PaymentManager\Support\EventManager\EventManagerInterface;
 use RuntimeException;
 use Meridaura\PaymentManager\DTO\PaymentPurchaseRequest;
 use Meridaura\PaymentManager\Support\Configurator\ConfiguratorInterface;
@@ -14,7 +16,7 @@ class PaymentRepository implements PaymentRepositoryInterface
     protected ?Closure $recurringCreator = null;
 
     public function __construct(
-        protected ConfiguratorInterface $configurator
+        protected ConfiguratorInterface $configurator,
     ) {}
 
     /**
@@ -39,30 +41,20 @@ class PaymentRepository implements PaymentRepositoryInterface
 
     public function createPaymentPurchase(PaymentPurchaseRequest $dto, array $paymentData = []): Payment
     {
-        // Якщо користувач не налаштував замикання — жорстко зупиняємо процес
         if (!$this->purchaseCreator) {
             throw new RuntimeException(
                 'Логіка створення платежу не визначена. Використайте PaymentRepository::createPurchaseUsing() у вашому ServiceProvider.'
             );
         }
 
-        // Викликаємо користувацьку логіку
+        /* @var $paymentModel Payment */
         $paymentModel = ($this->purchaseCreator)($dto, $paymentData);
 
-        // Викликаємо подію через конфігуратор
-        $this->fireEvent('paymentCreate', $paymentModel);
+        if ($paymentModel->wasRecentlyCreated) {
+            $this->events()->dispatchLifecycleStage($paymentModel, PaymentStageEnum::CREATED);
+        }
 
         return $paymentModel;
-    }
-
-    protected function fireEvent(string $eventKey, mixed $payload): void
-    {
-        // Отримуємо клас події через конфігуратор
-        $eventClass = $this->configurator->getEventClass($eventKey);
-
-        if ($eventClass && class_exists($eventClass)) {
-            event(new $eventClass($payload));
-        }
     }
 
     public function getModel(): Payment
@@ -80,12 +72,51 @@ class PaymentRepository implements PaymentRepositoryInterface
 
     public function update(Payment $payment, array $attributes): void
     {
-        foreach ($attributes as $key => $value) {
-            $payment->setAttribute($key, $value);
+        $validAttributes = array_filter(
+            $attributes,
+            fn($key) => !empty($key) && is_string($key),
+            ARRAY_FILTER_USE_KEY
+        );
+
+        if (empty($validAttributes)) {
+            return;
         }
 
-        $payment->save();
+        $statusColumn = $this->configurator->getStageColumn();
+        $statusChanged = false;
+        $oldStatus = null;
+        $newStatus = null;
 
-        $this->fireEvent('paymentUpdate', $payment);
+        if (array_key_exists($statusColumn, $validAttributes)) {
+            $oldStatus = $payment->getAttribute($statusColumn);
+            $newStatus = $validAttributes[$statusColumn];
+
+            if ($oldStatus !== $newStatus) {
+                $statusChanged = true;
+            }
+        }
+
+        $payment->forceFill($validAttributes);
+
+        if ($this->configurator->isSaveQuietlyEnabled()) {
+            $payment->saveQuietly();
+        } else {
+            $payment->save();
+        }
+
+        if ($statusChanged) {
+            $this->events()->dispatchChangeStatus($payment, $newStatus, $oldStatus);
+        }
+    }
+    public function getAttribute(Payment $payment, string $key, mixed $default = null): mixed
+    {
+        $dotNotationPath = str_replace('->', '.', $key);
+
+        return data_get($payment, $dotNotationPath, $default);
+    }
+
+    public function events(): EventManagerInterface
+    {
+        return app(EventManagerInterface::class);
     }
 }

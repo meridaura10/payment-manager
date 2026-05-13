@@ -13,6 +13,7 @@ class PaymentPurchaseResponse
         public readonly PaymentPurchaseRequest      $purchaseRequest,
         public readonly ?PaymentPurchaseApiResponse $gatewayResponse = null,
         public readonly ?Error                      $errors = null,
+        public readonly bool                        $isReused = false,
     ) {
         //
     }

@@ -2,15 +2,16 @@
 
 namespace Meridaura\PaymentManager\DTO;
 
-use Meridaura\PaymentManager\Enums\PaymentApiResponseStatusEnums;
+use Meridaura\PaymentManager\Enums\PaymentApiResponseStatusEnum;
 
 class PaymentPurchaseApiResponse
 {
     public function __construct(
-        readonly PaymentApiResponseStatusEnums $status,
-        readonly string|int|null $invoice_id = null,
-        readonly ?string $page_url = null,
-        readonly array $data = [],
+        readonly PaymentApiResponseStatusEnum $status,
+        readonly string|int|null              $invoice_id = null,
+        readonly ?string                      $page_url = null,
+        readonly array                        $data = [],
+        readonly bool                         $isReused = false,
     ) {
         //
     }

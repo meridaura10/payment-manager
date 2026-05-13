@@ -115,9 +115,7 @@ class PaymentManager implements PaymentManagerInterface
         $mergedConfig = array_merge($defaultConfig, $config);
 
         /* @var PaymentGatewayInterface $gateway */
-        $gateway = $this->customCreators[$driver]($this->container, $mergedConfig);
-        $gatewayConfig = $gateway->getGatewayConfig();
-        $gateway->setConfig(array_merge($gatewayConfig, $mergedConfig));
+        $gateway = $this->customCreators[$driver]($mergedConfig);
 
         return $gateway;
     }

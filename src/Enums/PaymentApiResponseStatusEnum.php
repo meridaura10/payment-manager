@@ -2,8 +2,9 @@
 
 namespace Meridaura\PaymentManager\Enums;
 
-enum PaymentResponseStatusEnum
+enum PaymentApiResponseStatusEnum
 {
     case SUCCESS;
+
     case ERROR;
 }

@@ -3,8 +3,8 @@
 namespace Meridaura\PaymentManager\Support\Configurator;
 
 use Illuminate\Support\Arr;
-use Meridaura\PaymentManager\Enums\PaymentTypeEnums;
-use Meridaura\PaymentManager\Enums\PaymentStateEnums;
+use Meridaura\PaymentManager\Enums\PaymentTypeEnum;
+use Meridaura\PaymentManager\Enums\PaymentStageEnum;
 
 class Configurator implements ConfiguratorInterface
 {
@@ -12,17 +12,25 @@ class Configurator implements ConfiguratorInterface
 
     public function __construct()
     {
-        // Завжди краще ставити [] як fallback, якщо конфіг раптом не знайдено
         $this->config = config('payment-manager', []);
+
+        foreach (PaymentTypeEnum::cases() as $type) {
+            $statuses = \Illuminate\Support\Arr::get($this->config, "database.statuses.{$type->name}", []);
+            $activeStatuses = array_filter($statuses);
+
+            if (count($activeStatuses) !== count(array_unique($activeStatuses))) {
+                throw new \RuntimeException("Payment Manager: Database statuses for PaymentTypeEnum::{$type->name} must be unique. Please check your configuration.");
+            }
+        }
     }
 
     /*
     |--------------------------------------------------------------------------
-    | Database Mapping (Колонки)
+    | Database Mapping (Columns)
     |--------------------------------------------------------------------------
     */
 
-    public function getPaymentModel(): string
+    public function getPaymentModel(): ?string
     {
         return Arr::get($this->config, 'model');
     }
@@ -47,9 +55,10 @@ class Configurator implements ConfiguratorInterface
         return Arr::get($this->config, 'database.columns.expires_at');
     }
 
-    public function getStatusColumn(): ?string
+    public function getStageColumn(): ?string
     {
-        return Arr::get($this->config, 'database.columns.status');
+        // Тепер посилаємось на 'state' у конфігу
+        return Arr::get($this->config, 'database.columns.state');
     }
 
     public function getTypeColumn(): ?string
@@ -57,25 +66,48 @@ class Configurator implements ConfiguratorInterface
         return Arr::get($this->config, 'database.columns.type');
     }
 
-    public function getTypeValue(string $key): ?string
+    public function getWebhookModifyAtColumName(): ?string
     {
-        return Arr::get($this->config, "database.type_values.{$key}");
+        return Arr::get($this->config, "database.columns.webhook_modify_at");
+    }
+
+    public function getWebhookDataColumName(): ?string
+    {
+        return Arr::get($this->config, "database.columns.webhook_data");
+    }
+
+    public function getResponseColumn(): ?string
+    {
+        return Arr::get($this->config, "database.columns.response");
     }
 
     /*
     |--------------------------------------------------------------------------
-    | Database Mapping (Значення)
+    | Values Mapping
     |--------------------------------------------------------------------------
     */
+
+    public function getTypeValue(string $key): ?string
+    {
+        return Arr::get($this->config, "database.type_values.{$key}");
+    }
 
     public function getPaymentMethodValue(string $key): ?string
     {
         return Arr::get($this->config, "database.method_values.{$key}");
     }
 
+    /**
+     * Отримує рядок (status) для бази даних на основі етапу (stage)
+     */
+    public function getStatusByStage(PaymentTypeEnum $type, PaymentStageEnum $stage): ?string
+    {
+        return Arr::get($this->config, "database.statuses.{$type->name}.{$stage->name}");
+    }
+
     /*
     |--------------------------------------------------------------------------
-    | Drivers & Features (Драйвери та Фічі)
+    | Drivers & Features
     |--------------------------------------------------------------------------
     */
 
@@ -84,71 +116,70 @@ class Configurator implements ConfiguratorInterface
         return Arr::get($this->config, "drivers.{$driverName}", []);
     }
 
-    /**
-     * Розумна перевірка: спочатку в драйвері, потім глобально
-     */
     public function isReuseLinksEnabled(string $driverName): bool
     {
-        // 1. Шукаємо специфічне налаштування для конкретного драйвера
         $driverFeature = Arr::get($this->config, "drivers.{$driverName}.features.reuse_links");
 
-        if (!is_null($driverFeature)) {
-            return (bool) $driverFeature;
-        }
-
-        // 2. Якщо в драйвері null (не вказано), беремо глобальне
-        return (bool) Arr::get($this->config, 'features.reuse_links', false);
+        return is_null($driverFeature)
+            ? (bool) Arr::get($this->config, 'features.reuse_links', false)
+            : (bool) $driverFeature;
     }
 
-    /**
-     * Отримує час життя посилання на оплату (у секундах).
-     * Спочатку перевіряє налаштування драйвера, потім глобальні.
-     */
     public function getLinkLifetime(string $driverName): ?int
     {
-        // 1. Шукаємо специфічне налаштування для конкретного драйвера
         $driverLifetime = Arr::get($this->config, "drivers.{$driverName}.features.link_lifetime");
 
-        if (!is_null($driverLifetime)) {
-            return (int) $driverLifetime;
-        }
-
-        // 2. Якщо в драйвері null, беремо глобальне значення (fallback: 3600 секунд)
-        return Arr::get($this->config, 'features.link_lifetime');
+        return is_null($driverLifetime)
+            ? Arr::get($this->config, 'features.link_lifetime')
+            : (int) $driverLifetime;
     }
 
     /*
     |--------------------------------------------------------------------------
-    | Events (Події)
+    | Events & Enums Resolver
     |--------------------------------------------------------------------------
     */
 
     public function getEventClass(string $key): ?string
     {
-        // У новому конфігу події лежать прямо за ключем (без вкладеності .class)
         return Arr::get($this->config, "events.{$key}");
     }
 
-    public function setEvent(string $key, ?string $eventClass): static
+    public function resolvePaymentType(string $key): ?PaymentTypeEnum
     {
-        // Використовуємо Arr::set, щоб безпечно перезаписати значення в масиві
-        Arr::set($this->config, "events.{$key}", $eventClass);
-
-        return $this;
+        return $this->resolveEnumFromMapping(
+            PaymentTypeEnum::class,
+            'database.type_values',
+            $key
+        );
     }
 
-    public function getStatusValue(PaymentTypeEnums $type, PaymentStateEnums $stage): ?string
+    /**
+     * Перетворює статус із бази (string) назад у внутрішній етап (stage)
+     */
+    public function resolveStageFromStatus(PaymentTypeEnum $type, string $dbStatus): ?PaymentStageEnum
     {
-        return Arr::get($this->config, "statuses.{$type->value}.{$stage->value}");
+        return $this->resolveEnumFromMapping(
+            PaymentStageEnum::class,
+            "database.statuses.{$type->name}",
+            $dbStatus
+        );
     }
 
-    public function getWebhookModifyAtColumName(): string
+    public function isSaveQuietlyEnabled(): bool
     {
-        return Arr::get($this->config, "database.columns.webhook_modify_at");
+        return (bool) Arr::get($this->config, 'features.save_quietly', false);
     }
 
-    public function getWebhookDataColumName(): string
+    protected function resolveEnumFromMapping(string $enumClass, string $configPath, string $key, mixed $default = null): mixed
     {
-        return Arr::get($this->config, "database.columns.webhook_data");
+        $mapping = Arr::get($this->config, $configPath, []);
+        $enumName = array_search($key, $mapping, true);
+
+        if ($enumName && defined("{$enumClass}::{$enumName}")) {
+            return constant("{$enumClass}::{$enumName}");
+        }
+
+        return $default;
     }
 }

@@ -18,5 +18,7 @@ interface PaymentRepositoryInterface
 
     public function findByExternId(string $value): ?Payment;
 
+    public function getAttribute(Payment $payment, string $key, mixed $default = null): mixed;
+
     public function update(Payment $payment, array $attributes): void;
 }

@@ -9,10 +9,10 @@ use Meridaura\PaymentManager\DTO\Error;
 use Meridaura\PaymentManager\DTO\PaymentPurchaseRequest;
 use Meridaura\PaymentManager\DTO\PaymentPurchaseApiResponse;
 use Meridaura\PaymentManager\DTO\PaymentPurchaseResponse;
-use Meridaura\PaymentManager\Enums\PaymentApiResponseStatusEnums;
+use Meridaura\PaymentManager\Enums\PaymentApiResponseStatusEnum;
 use Meridaura\PaymentManager\Enums\PaymentResponseStatusEnum;
-use Meridaura\PaymentManager\Enums\PaymentTypeEnums;
-use Meridaura\PaymentManager\Enums\PaymentStateEnums;
+use Meridaura\PaymentManager\Enums\PaymentTypeEnum;
+use Meridaura\PaymentManager\Enums\PaymentStageEnum;
 use Meridaura\PaymentManager\Models\Payment;
 use Meridaura\PaymentManager\Traits\UseCoreTrait;
 
@@ -30,13 +30,22 @@ abstract class AbstractCharge
 
         $payment = $this->repository()->createPaymentPurchase($purchaseRequest, $paymentData);
 
-        if ($this->getValidReusableUrl($payment)) {
+        if ($pageUrl = $this->getValidReusableUrl($payment)) {
+            $reuseApi = new PaymentPurchaseApiResponse(
+                status: PaymentApiResponseStatusEnum::SUCCESS,
+                invoice_id: $this->repository()->getAttribute($payment, $this->configurator()->getExternIdColumn()),
+                page_url: $pageUrl,
+                data: $this->repository()->getAttribute($payment, $this->configurator()->getResponseColumn(), []),
+                isReused: true,
+            );
+
             return new PaymentPurchaseResponse(
                 status: PaymentResponseStatusEnum::SUCCESS,
                 payment: $payment,
                 purchaseRequest: $purchaseRequest,
-                gatewayResponse: null,
-                errors: null
+                gatewayResponse: $reuseApi,
+                errors: null,
+                isReused: true,
             );
         }
 
@@ -54,7 +63,7 @@ abstract class AbstractCharge
                 purchaseRequest: $purchaseRequest,
                 gatewayResponse: null,
                 errors: new Error(
-                    message: __('payment-manager::messages.error_service_unavailable', ['default' => 'Payment service is temporarily unavailable.']),
+                    message: __('payment-manager::messages.error_service_unavailable'),
                     systemMessage: 'Internal error during request building or gateway connection.',
                     gatewayMessage: $throwable->getMessage(),
                     code: $throwable->getCode(),
@@ -71,7 +80,7 @@ abstract class AbstractCharge
                 purchaseRequest: $purchaseRequest,
                 gatewayResponse: $gatewayResponse,
                 errors: new Error(
-                    message: __('payment-manager::messages.error_invalid_gateway_response', ['default' => 'Payment gateway returned an invalid response.']),
+                    message: __('payment-manager::messages.error_invalid_gateway_response'),
                     systemMessage: 'Gateway did not return required data (e.g., page_url or invoice_id).',
                     gatewayMessage: null,
                     code: 502,
@@ -86,11 +95,11 @@ abstract class AbstractCharge
             payment: $payment,
             purchaseRequest: $purchaseRequest,
             gatewayResponse: $gatewayResponse,
-            errors: null
+            errors: null,
         );
     }
 
-    private function getValidReusableUrl(Payment $payment): ?string
+    protected function getValidReusableUrl(Payment $payment): ?string
     {
         if (!$this->configurator()->isReuseLinksEnabled($this->getGatewayName())) {
             return null;
@@ -99,13 +108,13 @@ abstract class AbstractCharge
         $pageUrlColumn = $this->configurator()->getPageUrlColumn();
         $expiresAtColumn = $this->configurator()->getExpiresAtColumn();
 
-        $pageUrl = $payment->{$pageUrlColumn} ?? null;
+        $pageUrl = $this->repository()->getAttribute($payment, $pageUrlColumn);
 
         if (empty($pageUrl)) {
             return null;
         }
 
-        $expiresAt = $payment->{$expiresAtColumn} ?? null;
+        $expiresAt = $this->repository()->getAttribute($payment, $expiresAtColumn);
 
         if ($expiresAt && \Carbon\Carbon::parse($expiresAt)->isPast()) {
             return null;
@@ -126,17 +135,17 @@ abstract class AbstractCharge
         return $this->gatewayName;
     }
 
-    private function getCreatePaymentData(): array
+    protected function getCreatePaymentData(): array
     {
         $data = [
-            $this->configurator()->getTypeColumn() => $this->configurator()->getTypeValue(PaymentTypeEnums::MANUAL->value),
+            $this->configurator()->getTypeColumn() => $this->configurator()->getTypeValue(PaymentTypeEnum::MANUAL->name),
             $this->configurator()->getPaymentGatewayColumn() => $this->gatewayName,
         ];
 
-        $createdStatus = $this->configurator()->getStatusValue(PaymentTypeEnums::MANUAL, PaymentStateEnums::CREATED);
+        $createdStatus = $this->configurator()->getStatusByStage(PaymentTypeEnum::MANUAL, PaymentStageEnum::CREATED);
 
         if ($createdStatus) {
-            $data[$this->configurator()->getStatusColumn()] = $createdStatus;
+            $data[$this->configurator()->getStageColumn()] = $createdStatus;
         }
 
         return $data;
@@ -144,37 +153,42 @@ abstract class AbstractCharge
 
     protected function markPaymentAsFailed(Payment $payment): void
     {
-        $errorStatus = $this->configurator()->getStatusValue(PaymentTypeEnums::MANUAL, PaymentStateEnums::PENDING);
+        $failedStage = $this->configurator()->getStatusByStage(PaymentTypeEnum::MANUAL, PaymentStageEnum::FAILED);
 
-        if ($errorStatus) {
+        if ($failedStage) {
             $this->repository()->update($payment, [
-                $this->configurator()->getStatusColumn() => $errorStatus
+                $this->configurator()->getStageColumn() => $failedStage
             ]);
         }
+
+        $this->events()->dispatchLifecycleStage($payment, PaymentStageEnum::FAILED);
     }
 
-    private function sendHttpRequest(GatewayRequest $gatewayRequest): Response
+    protected function sendHttpRequest(GatewayRequest $gatewayRequest): Response
     {
         return Http::withHeaders($gatewayRequest->headers)
             ->send($gatewayRequest->method, $gatewayRequest->url, [$gatewayRequest->encoding => $gatewayRequest->payload]);
     }
 
-    public function handleSuccessfulGatewayResponse(Payment $payment, PaymentPurchaseApiResponse $gatewayResponse): void
+    protected function handleSuccessfulGatewayResponse(Payment $payment, PaymentPurchaseApiResponse $gatewayResponse): void
     {
         $lifetimeSeconds = $this->configurator()->getLinkLifetime($this->getGatewayName());
 
         $updateData = [
+            $this->configurator()->getResponseColumn() => $gatewayResponse->data,
             $this->configurator()->getPageUrlColumn() => $gatewayResponse->page_url,
             $this->configurator()->getExternIdColumn() => $gatewayResponse->invoice_id,
             $this->configurator()->getExpiresAtColumn() => $lifetimeSeconds ? now()->addSeconds($lifetimeSeconds) : null,
         ];
 
         $this->repository()->update($payment, $updateData);
+
+        $this->events()->dispatchLifecycleStage($payment, PaymentStageEnum::PENDING);
     }
 
-    private function isValidGatewayResponse(PaymentPurchaseApiResponse $gatewayResponse): bool
+    protected function isValidGatewayResponse(PaymentPurchaseApiResponse $gatewayResponse): bool
     {
-        if ($gatewayResponse->status === PaymentApiResponseStatusEnums::ERROR || empty($gatewayResponse->page_url)) {
+        if ($gatewayResponse->status === PaymentApiResponseStatusEnum::ERROR || empty($gatewayResponse->page_url)) {
             return false;
         }
 

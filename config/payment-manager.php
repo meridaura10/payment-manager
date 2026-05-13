@@ -1,7 +1,8 @@
 <?php
 
-use Meridaura\PaymentManager\Enums\PaymentTypeEnums;
-use \Meridaura\PaymentManager\Enums\PaymentStateEnums;
+use Meridaura\PaymentManager\Enums\PaymentEventEnum;
+use Meridaura\PaymentManager\Enums\PaymentTypeEnum;
+use \Meridaura\PaymentManager\Enums\PaymentStageEnum;
 
 return [
 
@@ -29,7 +30,8 @@ return [
             'extern_id'  => 'extern_id',
             'page_url'   => 'page_url',
             'expires_at' => 'expires_at',
-            'status'     => 'status',
+            'state'     =>  'status',
+            'response'   => 'added->response',
             'webhook_data' => 'added->notify',
             'webhook_modify_at' => 'webhook_modify_at',
         ],
@@ -40,26 +42,26 @@ return [
         |--------------------------------------------------------------------------
         */
         'statuses' => [
-            PaymentTypeEnums::MANUAL->value => [
-                PaymentStateEnums::CREATED->value  => 'new',       // Створили
-                PaymentStateEnums::PENDING->value  => 'pending',   // Є лінк, чекаємо
-                PaymentStateEnums::PAID->value     => 'paid',      // Гроші зайшли
-                PaymentStateEnums::FAILED->value   => 'error',     // Помилка API або відмова банку
-                PaymentStateEnums::CANCELED->value => 'expired',   // Лінк протерміновано
+            PaymentTypeEnum::MANUAL->name => [
+                PaymentStageEnum::CREATED->name  => 'new',       // Створили
+                PaymentStageEnum::PENDING->name  => 'pending',   // Є лінк, чекаємо
+                PaymentStageEnum::PAID->name     => 'paid',      // Гроші зайшли
+                PaymentStageEnum::FAILED->name   => 'error',     // Помилка API або відмова банку
+                PaymentStageEnum::CANCELED->name => 'expired',   // Лінк протерміновано
             ],
-            PaymentTypeEnums::RECURRING->value => [
-                PaymentStateEnums::CREATED->value  => 'new',       // Створили
-                PaymentStateEnums::PENDING->value  => 'pending',   // Є лінк, чекаємо
-                PaymentStateEnums::PAID->value     => 'paid',      // Гроші зайшли
-                PaymentStateEnums::FAILED->value   => 'error',     // Помилка API або відмова банку
-                PaymentStateEnums::CANCELED->value => 'expired',   // Лінк протерміновано
+            PaymentTypeEnum::RECURRING->name => [
+                PaymentStageEnum::CREATED->name  => 'new',       // Створили
+                PaymentStageEnum::PENDING->name  => 'pending',   // Є лінк, чекаємо
+                PaymentStageEnum::PAID->name     => 'paid',      // Гроші зайшли
+                PaymentStageEnum::FAILED->name   => 'error',     // Помилка API або відмова банку
+                PaymentStageEnum::CANCELED->name => 'expired',   // Лінк протерміновано
             ]
         ],
 
         // Values to save in the 'method' column depending on the transaction type
         'type_values' => [
-            PaymentTypeEnums::MANUAL->value => 'manual',
-            PaymentTypeEnums::RECURRING->value => 'recurring',
+            PaymentTypeEnum::MANUAL->name => 'manual',
+            PaymentTypeEnum::RECURRING->name => 'recurring',
         ],
     ],
 
@@ -78,6 +80,8 @@ return [
         // The default lifetime of a checkout link in seconds (e.g., 3600 = 1 hour).
         // Used to calculate the 'expires_at' timestamp for the database and gateway.
         'link_lifetime' => 3600,
+
+        'save_quietly' => false,
     ],
 
     /*
@@ -94,7 +98,7 @@ return [
 
             // Driver-specific features. Set to null to fallback to global features.
             'features' => [
-                'reuse_links'   => null, // Set to false to disable ONLY for Monobank
+                'reuse_links'   => false, // Set to false to disable ONLY for Monobank
                 'link_lifetime' => null, // Override the global checkout link lifetime
             ]
         ],
@@ -107,10 +111,23 @@ return [
     | Map package events to your own application's event classes.
     */
     'events' => [
-//        PaymentStateEnums::CREATED->value  => null,       // Створили
-//        PaymentStateEnums::PENDING->value  => 'pending',   // Є лінк, чекаємо
-//        PaymentStateEnums::PAID->value     => 'paid',      // Гроші зайшли
-//        PaymentStateEnums::FAILED->value   => 'error',     // Помилка API або відмова банку
-//        PaymentStateEnums::CANCELED->value => 'expired',
+        PaymentEventEnum::STATUS_CHANGED->name => null,
+
+        PaymentTypeEnum::MANUAL->name => [
+            PaymentStageEnum::CREATED->name  => null,       // Створили
+            PaymentStageEnum::PENDING->name  => null,   // Є лінк, чекаємо
+            PaymentStageEnum::PAID->name     => null,      // Гроші зайшли
+            PaymentStageEnum::FAILED->name   => null,     // Помилка API або відмова банку
+            PaymentStageEnum::CANCELED->name => null,   // Лінк протерміновано
+            PaymentEventEnum::STATUS_CHANGED->name => null,
+        ],
+        PaymentTypeEnum::RECURRING->name => [
+            PaymentStageEnum::CREATED->name  => null,       // Створили
+            PaymentStageEnum::PENDING->name  => null,   // Є лінк, чекаємо
+            PaymentStageEnum::PAID->name     => null,      // Гроші зайшли
+            PaymentStageEnum::FAILED->name   => null,     // Помилка API або відмова банку
+            PaymentStageEnum::CANCELED->name => null,   // Лінк протерміновано
+            PaymentEventEnum::STATUS_CHANGED->name => null,
+        ],
     ],
 ];
