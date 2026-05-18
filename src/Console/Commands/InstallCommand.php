@@ -28,13 +28,10 @@ class InstallCommand extends Command
     {
         $this->components->info('Installing Payment Manager...');
 
-        // 1. Publish config
         $this->call('vendor:publish', ['--tag' => 'payment-config']);
-
-        // 2. Publish ServiceProvider
         $this->call('vendor:publish', ['--tag' => 'payment-provider']);
+        $this->call('vendor:publish', ['--tag' => 'payment-migrations']);
 
-        // 3. Register the ServiceProvider automatically (Laravel 11+)
         $this->registerServiceProvider();
 
         $this->components->info('Payment Manager installed successfully!');

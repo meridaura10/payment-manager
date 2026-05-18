@@ -3,17 +3,19 @@
 namespace Meridaura\PaymentManager\Drivers;
 
 use Carbon\Carbon;
+use Meridaura\PaymentManager\Contracts\HandlesPaymentTypeWebhookInterface;
 use Meridaura\PaymentManager\DTO\Error;
-use Meridaura\PaymentManager\DTO\WebhookParseData;
-use Meridaura\PaymentManager\DTO\WebhookResponse;
+use Meridaura\PaymentManager\DTO\Webhook\WebhookParseData;
+use Meridaura\PaymentManager\DTO\Webhook\WebhookResponse;
 use Meridaura\PaymentManager\Enums\PaymentStageEnum;
-use Meridaura\PaymentManager\Enums\PaymentTypeEnum;
 use Meridaura\PaymentManager\Models\Payment;
 use Meridaura\PaymentManager\Traits\UseCoreTrait;
 
 abstract class AbstractWebhook
 {
     use UseCoreTrait;
+
+    private ?AbstractDriver $driver = null;
 
     public function handle(array $allRequestData = []): WebhookResponse
     {
@@ -36,14 +38,73 @@ abstract class AbstractWebhook
         }
 
         $paymentType = $this->resolvePaymentType($payment);
+        $paymentOperation = $this->resolvePaymentOperation($payment);
 
         if (!$paymentType) {
             return $this->buildErrorResponse($data, 'invalid_payment_type', ['type' => $this->getRawPaymentType($payment)]);
         }
 
-        $this->syncPaymentState($payment, $data, $paymentType);
+        $typeHandlerClass = $this->driver()?->getTypeClass($paymentType);
+
+        if ($typeHandlerClass instanceof HandlesPaymentTypeWebhookInterface) {
+            return $typeHandlerClass->handleWebhook($payment, $data);
+        }
+
+        if ($error = $this->beforeHooks($payment, $data, $paymentType, $paymentOperation, $typeHandlerClass)) {
+            return new WebhookResponse(payment: $payment, parseData: $data, error: $error);
+        }
+
+        $this->defaultHandler($payment, $data, $paymentType, $paymentOperation);
+
+        if ($error = $this->afterHooks($payment, $data, $paymentType, $paymentOperation, $typeHandlerClass)) {
+            return new WebhookResponse(payment: $payment, parseData: $data, error: $error);
+        }
 
         return new WebhookResponse(payment: $payment, parseData: $data);
+    }
+
+    protected function beforeHooks(Payment $payment, WebhookParseData $data, \UnitEnum|string $type, \UnitEnum|string|null $operation, ?object $typeHandlerClass = null): ?Error
+    {
+        $typeStr = $type instanceof \UnitEnum ? $type->name : $type;
+        $hookMethod = 'webhookBefore' . ucfirst(strtolower($typeStr)) . 'Handler';
+
+        $targets = array_filter([$this, $typeHandlerClass]);
+
+        foreach ($targets as $target) {
+            if (method_exists($target, $hookMethod)) {
+                $error = $target->{$hookMethod}($payment, $data, $operation);
+                if ($error instanceof Error) return $error;
+            }
+
+//            if (method_exists($target, 'webhookBeforeHandler')) {
+//                $error = $target->webhookBeforeHandler($payment, $data, $type, $operation);
+//                if ($error instanceof Error) return $error;
+//            }
+        }
+
+        return null;
+    }
+
+    protected function afterHooks(Payment $payment, WebhookParseData $data, \UnitEnum|string $type, \UnitEnum|string|null $operation, ?object $typeHandlerClass = null): ?Error
+    {
+        $typeStr = $type instanceof \UnitEnum ? $type->name : $type;
+        $hookMethod = 'webhookAfter' . ucfirst(strtolower($typeStr)) . 'Handler';
+
+        $targets = array_filter([$this, $typeHandlerClass]);
+
+        foreach ($targets as $target) {
+            if (method_exists($target, $hookMethod)) {
+                $error = $target->{$hookMethod}($payment, $data, $operation);
+                if ($error instanceof Error) return $error;
+            }
+
+//            if (method_exists($target, 'webhookAfterHandler')) {
+//                $error = $target->webhookAfterHandler($payment, $data, $type, $operation);
+//                if ($error instanceof Error) return $error;
+//            }
+        }
+
+        return null;
     }
 
     protected function findPayment(string|int|null $externId): ?Payment
@@ -63,10 +124,10 @@ abstract class AbstractWebhook
             return false;
         }
 
-        return Carbon::parse($lastModified)->greaterThanOrEqualTo($data->modifiedDate);
+        return Carbon::parse($lastModified)->greaterThan($data->modifiedDate);
     }
 
-    protected function resolvePaymentType(Payment $payment): ?PaymentTypeEnum
+    protected function resolvePaymentType(Payment $payment): \UnitEnum|string|null
     {
         $typeStr = $this->getRawPaymentType($payment);
 
@@ -78,23 +139,36 @@ abstract class AbstractWebhook
         return (string) $this->repository()->getAttribute($payment, $this->configurator()->getTypeColumn());
     }
 
-    protected function syncPaymentState(Payment $payment, WebhookParseData $data, PaymentTypeEnum $type): void
+    protected function resolvePaymentOperation(Payment $payment): \UnitEnum|string|null
     {
-        $oldDbStatus = $this->repository()->getAttribute($payment, $this->configurator()->getStageColumn());
-        $newDbStatus = $this->configurator()->getStatusByStage($type, $data->stage);
+        $operationColumn = $this->configurator()->getOperationColumn();
 
-        $this->updateDatabaseStatus($payment, $data, $oldDbStatus, $newDbStatus);
+        if (!$operationColumn) {
+            return null;
+        }
 
-        $oldStageEnum = $this->configurator()->resolveStageFromStatus($type, $oldDbStatus);
+        $operationStr = (string) $this->repository()->getAttribute($payment, $operationColumn);
 
-        $this->dispatchLifecycleStageIfChanged($payment, $oldStageEnum, $data->stage);
+        return $this->configurator()->resolveOperation($operationStr) ?? $operationStr;
     }
 
-    protected function updateDatabaseStatus(Payment $payment, WebhookParseData $data, ?string $oldDbStatus, ?string $newDbStatus): void
+    protected function defaultHandler(Payment $payment, WebhookParseData $data, \UnitEnum|string $type, \UnitEnum|string|null $operation): void
+    {
+        $oldDbStatus = $this->repository()->getAttribute($payment, $this->configurator()->getStageColumn());
+        $newDbStatus = $this->configurator()->getStatusByStage($data->stage, $type, $operation);
+
+        $this->updateDatabaseStatus($payment, $data, $oldDbStatus, $newDbStatus, $operation);
+
+        $oldStageEnum = $this->configurator()->resolveStageFromStatus($oldDbStatus, $type, $operation);
+
+        $this->dispatchLifecycleStageIfChanged($payment, $oldStageEnum, $data->stage, $operation);
+    }
+
+    protected function updateDatabaseStatus(Payment $payment, WebhookParseData $data, ?string $oldDbStatus, ?string $newDbStatus, \UnitEnum|string|null $operation): void
     {
         if ($this->hasDatabaseStatusChanged($oldDbStatus, $newDbStatus)) {
             $this->saveWebhookDataWithNewStatus($payment, $data, $newDbStatus);
-            $this->events()->dispatchChangeStatus($payment, $newDbStatus, $oldDbStatus);
+            $this->events()->dispatchChangeStatus($payment, $newDbStatus, $oldDbStatus, $operation);
         } else {
             $this->saveWebhookDataOnly($payment, $data);
         }
@@ -105,10 +179,10 @@ abstract class AbstractWebhook
         return $newDbStatus !== null && $newDbStatus !== $oldDbStatus;
     }
 
-    protected function dispatchLifecycleStageIfChanged(Payment $payment, ?PaymentStageEnum $oldStage, ?PaymentStageEnum $newStage): void
+    protected function dispatchLifecycleStageIfChanged(Payment $payment, ?PaymentStageEnum $oldStage, ?PaymentStageEnum $newStage, \UnitEnum|string|null $operation): void
     {
         if ($oldStage !== $newStage) {
-            $this->events()->dispatchLifecycleStage($payment, $newStage);
+            $this->events()->dispatchLifecycleStage($payment, $newStage, $operation);
         }
     }
 
@@ -136,6 +210,18 @@ abstract class AbstractWebhook
             parseData: $data,
             error: new Error(__("payment-manager::messages.{$messageKey}", $replace))
         );
+    }
+
+    public function setDriver(AbstractDriver $driver): static
+    {
+        $this->driver = $driver;
+
+        return $this;
+    }
+
+    public function driver(): ?AbstractDriver
+    {
+        return $this->driver;
     }
 
     abstract function parseRequestData(array $allRequestData = []): WebhookParseData;

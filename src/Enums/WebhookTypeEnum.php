@@ -2,7 +2,7 @@
 
 namespace Meridaura\PaymentManager\Enums;
 
-enum PaymentTypeEnum
+enum WebhookTypeEnum
 {
     case CHARGE;
 

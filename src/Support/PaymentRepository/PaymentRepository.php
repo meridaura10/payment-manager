@@ -2,59 +2,82 @@
 
 namespace Meridaura\PaymentManager\Support\PaymentRepository;
 
-use Closure;
 use Meridaura\PaymentManager\Enums\PaymentStageEnum;
 use Meridaura\PaymentManager\Models\Payment;
+use Meridaura\PaymentManager\Support\Configurator\ConfiguratorInterface;
 use Meridaura\PaymentManager\Support\EventManager\EventManagerInterface;
 use RuntimeException;
-use Meridaura\PaymentManager\DTO\PaymentPurchaseRequest;
-use Meridaura\PaymentManager\Support\Configurator\ConfiguratorInterface;
 
 class PaymentRepository implements PaymentRepositoryInterface
 {
-    protected ?Closure $purchaseCreator = null;
-    protected ?Closure $recurringCreator = null;
+    protected array $creators = [];
+    protected ?\Closure $defaultCreator = null;
 
     public function __construct(
         protected ConfiguratorInterface $configurator,
-    ) {}
+    ) {
+        //
+    }
 
-    /**
-     * Встановлює логіку створення нового платежу.
-     *
-     * @param Closure(PaymentPurchaseRequest $dto, string $gateway): mixed $callback
-     * @return static
-     */
-    public function createPurchaseUsing(Closure $callback): static
+    public function setDefaultCreator(\Closure $callback): static
     {
-        $this->purchaseCreator = $callback;
+        $this->defaultCreator = $callback;
 
         return $this;
     }
 
-    public function createRecurringUsing(Closure $callback): static
+    public function setCreatorUsing(\UnitEnum|array|string $type, \Closure $callback, \UnitEnum|string|array|null $operation = null): static
     {
-        $this->recurringCreator = $callback;
+        $types = is_array($type) ? $type : [$type];
+        $operations = is_null($operation) ? [] : array_filter(is_array($operation) ? $operation : [$operation]);
+
+        foreach ($types as $typeItem) {
+            $typeStr = $typeItem instanceof \UnitEnum ? $typeItem->name : $typeItem;
+
+            if (!isset($this->creators[$typeStr])) {
+                $this->creators[$typeStr] = [];
+            }
+
+            if (empty($operations)) {
+                $this->creators[$typeStr]['*'] = $callback;
+            } else {
+                foreach ($operations as $operationItem) {
+                    $operationStr = $operationItem instanceof \UnitEnum ? $operationItem->name : $operationItem;
+                    $this->creators[$typeStr][$operationStr] = $callback;
+                }
+            }
+        }
 
         return $this;
     }
 
-    public function createPaymentPurchase(PaymentPurchaseRequest $dto, array $paymentData = []): Payment
+    public function resolvePayment(\UnitEnum|string $type, mixed $dto, array $paymentData = [], \UnitEnum|string|null $operation = null): Payment
     {
-        if (!$this->purchaseCreator) {
-            throw new RuntimeException(
-                'Логіка створення платежу не визначена. Використайте PaymentRepository::createPurchaseUsing() у вашому ServiceProvider.'
-            );
+        $typeStr = $type instanceof \UnitEnum ? $type->name : $type;
+        $operationStr = $operation instanceof \UnitEnum ? $operation->name : $operation;
+
+        if (!is_null($operation)) {
+            $creator = $this->creators[$typeStr][$operationStr] ?? ($this->creators[$typeStr]['*'] ?? null);
+        } else {
+            $creator = $this->creators[$typeStr]['*'] ?? null;
         }
 
-        /* @var $paymentModel Payment */
-        $paymentModel = ($this->purchaseCreator)($dto, $paymentData);
-
-        if ($paymentModel->wasRecentlyCreated) {
-            $this->events()->dispatchLifecycleStage($paymentModel, PaymentStageEnum::CREATED);
+        if (!is_callable($creator) && is_callable($this->defaultCreator)) {
+            $creator = $this->defaultCreator;
         }
 
-        return $paymentModel;
+        if (!is_callable($creator)) {
+            $opMessage = $operationStr ? "::$operationStr" : "";
+            throw new RuntimeException("Логіка створення платежу для типу [{$typeStr}{$opMessage}] не визначена.");
+        }
+
+        $payment = $creator($dto, $paymentData);
+
+        if ($payment->wasRecentlyCreated) {
+            $this->events()->dispatchLifecycleStage($payment, PaymentStageEnum::CREATED, $operation);
+        }
+
+        return $payment;
     }
 
     public function getModel(): Payment

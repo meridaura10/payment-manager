@@ -1,0 +1,59 @@
+<?php
+
+namespace App\Providers;
+
+use Illuminate\Support\ServiceProvider;
+use Meridaura\PaymentManager\Contracts\PaymentManagerInterface;
+use Meridaura\PaymentManager\Support\PaymentRepository\PaymentRepositoryInterface;
+
+class PaymentManagerServiceProvider extends ServiceProvider
+{
+    public function register(): void
+    {
+        //
+    }
+
+    public function boot(): void
+    {
+        $manager = $this->app->make(PaymentManagerInterface::class);
+        $repository = $this->app->make(PaymentRepositoryInterface::class);
+        
+        $this->configurePaymentCreation($repository);
+        $this->registerCustomDrivers($manager);
+    }
+
+    /**
+     * Configure how payment records are created.
+     */
+    protected function configurePaymentCreation(PaymentRepositoryInterface $repository): void
+    {
+        /*
+         * GLOBAL DEFAULT
+         * Applies to any type and operation unless explicitly overridden below.
+         */
+        $repository->setDefaultCreator(
+            callback: function (mixed $dto, array $paymentData = []) {
+                return Payment::query()->firstOrCreate([
+                    'gateway'   => $paymentData['gateway'] ?? null,
+                    'type'    => $paymentData['type'] ?? null,
+                    'operation' => $paymentData['operation'] ?? null,
+                    'status'    => 'new', // Initial database status
+                ], [
+                    'amount'   => $dto->amount ?? 0,
+                    'currency' => $dto->currency ?? 'UAH',
+                    ...$paymentData
+                ]);
+            }
+        );
+    }
+
+    /**
+     * Register custom payment gateway drivers.
+     */
+    protected function registerCustomDrivers(PaymentManagerInterface $paymentManager): void
+    {
+        // $paymentManager->extend('custom_gateway', function (array $config = []) {
+        //     return new \App\PaymentHandlers\CustomGatewayDriver($config);
+        // });
+    }
+}

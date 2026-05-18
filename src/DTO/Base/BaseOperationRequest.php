@@ -1,17 +1,17 @@
 <?php
 
-namespace Meridaura\PaymentManager\DTO;
+namespace Meridaura\PaymentManager\DTO\Base;
 
 use Illuminate\Database\Eloquent\Model;
 
-class PaymentPurchaseRequest
+class BaseOperationRequest
 {
     public function __construct(
         readonly public Model $payable,
         readonly public string|int $currency,
         readonly public float $amount,
-        readonly public ?string $webHookUrl = null,
-        readonly public ?string $redirectUrl = null,
+        readonly public null|string|array $webHookUrls = null,
+        readonly public null|string|array $redirectUrls = null,
         readonly public array $driverData = [],
         readonly public array $paymentData = [],
     ) {}

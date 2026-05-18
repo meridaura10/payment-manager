@@ -1,0 +1,146 @@
+<?php
+
+namespace {{ namespace }};
+
+use Illuminate\Http\Client\Response;
+use Illuminate\Support\Str;
+use Meridaura\PaymentManager\Drivers\AbstractBaseHandler;
+use Meridaura\PaymentManager\DTO\Base\BaseOperationRequest;
+use Meridaura\PaymentManager\DTO\Base\BaseOperationResponse;
+use Meridaura\PaymentManager\DTO\Base\BaseParseResponse;
+use Meridaura\PaymentManager\DTO\GatewayRequest;
+use Meridaura\PaymentManager\DTO\Error;
+use Meridaura\PaymentManager\Enums\PaymentApiResponseStatusEnum;
+use Meridaura\PaymentManager\Enums\PaymentResponseStatusEnum;
+use Meridaura\PaymentManager\Models\Payment;
+
+class {{ class }} extends AbstractBaseHandler
+{
+    protected \UnitEnum|string $paymentType = 'custom_type';
+
+    protected \UnitEnum|string $operation = 'custom_operation';
+
+    public function __construct(
+        protected array $config = []
+    ) {
+        //
+    }
+
+    public function process(BaseOperationRequest $request): BaseOperationResponse
+    {
+        $operation = $this->operation;
+
+        $paymentData = array_merge(
+            $request->paymentData,
+            $this->getCreatePaymentData($operation),
+        );
+
+        $payment = $this->repository()->resolvePayment($this->paymentType, $request, $paymentData);
+
+        if ($pageUrl = $this->getValidReusableSetupUrl($payment, $operation)) {
+            $response = new BaseParseResponse(
+                status: PaymentApiResponseStatusEnum::SUCCESS,
+                invoice_id: $this->repository()->getAttribute($payment, $this->configurator()->getExternIdColumn()),
+                page_url: $pageUrl,
+                data: $this->repository()->getAttribute($payment, $this->configurator()->getResponseColumn(), []),
+                isReused: true,
+            );
+
+            return new BaseOperationResponse(
+                status: PaymentResponseStatusEnum::SUCCESS,
+                payment: $payment,
+                request: $request,
+                response: $response,
+                errors: null,
+                isReused: true,
+            );
+        }
+
+        try {
+            $gatewayRequest = $this->buildGatewayRequest($request, $payment);
+            $httpResponse = $this->sendHttpRequest($gatewayRequest);
+            $response = $this->parseGatewayResponse($httpResponse, $payment);
+        } catch (\Throwable $throwable) {
+            $this->markPaymentAsFailed($payment, $operation);
+
+            return new BaseOperationResponse(
+                status: PaymentResponseStatusEnum::ERROR,
+                payment: $payment,
+                request: $request,
+                response: null,
+                errors: new Error(
+                    message: __('payment-manager::messages.error_service_unavailable'),
+                    systemMessage: 'Internal error during request building or gateway connection.',
+                    gatewayMessage: $throwable->getMessage(),
+                    code: $throwable->getCode(),
+                )
+            );
+        }
+
+        if (!$this->isValidSetupResponse($response)) {
+            $this->markPaymentAsFailed($payment, $operation);
+
+            return new BaseOperationResponse(
+                status: PaymentResponseStatusEnum::ERROR,
+                payment: $payment,
+                request: $request,
+                response: $response,
+                errors: new Error(
+                    message: __('payment-manager::messages.error_invalid_gateway_response'),
+                    systemMessage: 'Gateway did not return required data.',
+                    gatewayMessage: null,
+                    code: 502,
+                )
+            );
+        }
+
+        $this->handleSuccessfulSetupResponse($payment, $response, $operation);
+
+        return new BaseOperationResponse(
+            status: PaymentResponseStatusEnum::SUCCESS,
+            payment: $payment,
+            request: $request,
+            response: $response,
+            errors: null,
+        );
+    }
+
+    protected function buildGatewayRequest(BaseOperationRequest $request, Payment $payment): GatewayRequest
+    {
+        $data = [
+            'amount' => $request->amount * 100,
+            'ccy' => 980,
+            'webhookUrl' => $request->webHookUrls ?? null,
+            'redirectUrl' => $request->redirectUrls ?? null,
+            'saveCardData' => [
+                'saveCard' => true,
+                'walletId' => Str::uuid()->toString(),
+            ]
+        ];
+
+        $headers['X-Token'] = $this->config['X-Token'] ?? null;
+
+        return new GatewayRequest(
+            url: "{$this->config['base_url']}/api/payment",
+            payload: $data,
+            headers: $headers ?? [],
+            method: 'POST',
+        );
+    }
+
+    protected function parseGatewayResponse(Response $response, Payment $payment): BaseParseResponse
+    {
+        $json = $response->json();
+
+        $status = isset($json['errCode'])
+            ? PaymentApiResponseStatusEnum::ERROR
+            : PaymentApiResponseStatusEnum::SUCCESS;
+
+        return new BaseParseResponse(
+            status: $status,
+            invoice_id: $json['invoiceId'] ?? null,
+            page_url: $json['pageUrl'] ?? null,
+            data: $json,
+        );
+    }
+}

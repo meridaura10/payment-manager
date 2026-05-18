@@ -1,7 +1,8 @@
 <?php
 
-namespace Meridaura\PaymentManager\DTO;
+namespace Meridaura\PaymentManager\DTO\Webhook;
 
+use Meridaura\PaymentManager\DTO\Error;
 use Meridaura\PaymentManager\Models\Payment;
 
 class WebhookResponse

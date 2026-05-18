@@ -3,32 +3,25 @@
 namespace Meridaura\PaymentManager\Support\Configurator;
 
 use Illuminate\Support\Arr;
+use Meridaura\PaymentManager\Enums\PaymentOperationEnum;
 use Meridaura\PaymentManager\Enums\PaymentTypeEnum;
 use Meridaura\PaymentManager\Enums\PaymentStageEnum;
 
 class Configurator implements ConfiguratorInterface
 {
     protected array $config = [];
+    protected array $typeMap = [];
+    protected array $operationMap = [];
+    protected array $stageMap = [];
 
     public function __construct()
     {
         $this->config = config('payment-manager', []);
 
-        foreach (PaymentTypeEnum::cases() as $type) {
-            $statuses = \Illuminate\Support\Arr::get($this->config, "database.statuses.{$type->name}", []);
-            $activeStatuses = array_filter($statuses);
-
-            if (count($activeStatuses) !== count(array_unique($activeStatuses))) {
-                throw new \RuntimeException("Payment Manager: Database statuses for PaymentTypeEnum::{$type->name} must be unique. Please check your configuration.");
-            }
-        }
+        $this->buildTypeMap();
+        $this->buildOperationMap();
+        $this->buildStageMap();
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Database Mapping (Columns)
-    |--------------------------------------------------------------------------
-    */
 
     public function getPaymentModel(): ?string
     {
@@ -57,7 +50,6 @@ class Configurator implements ConfiguratorInterface
 
     public function getStageColumn(): ?string
     {
-        // Тепер посилаємось на 'state' у конфігу
         return Arr::get($this->config, 'database.columns.state');
     }
 
@@ -66,104 +58,97 @@ class Configurator implements ConfiguratorInterface
         return Arr::get($this->config, 'database.columns.type');
     }
 
+    public function getOperationColumn(): ?string
+    {
+        return Arr::get($this->config, 'database.columns.operation');
+    }
+
     public function getWebhookModifyAtColumName(): ?string
     {
-        return Arr::get($this->config, "database.columns.webhook_modify_at");
+        return Arr::get($this->config, 'database.columns.webhook_modify_at');
     }
 
     public function getWebhookDataColumName(): ?string
     {
-        return Arr::get($this->config, "database.columns.webhook_data");
+        return Arr::get($this->config, 'database.columns.webhook_data');
     }
 
     public function getResponseColumn(): ?string
     {
-        return Arr::get($this->config, "database.columns.response");
+        return Arr::get($this->config, 'database.columns.response');
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Values Mapping
-    |--------------------------------------------------------------------------
-    */
-
-    public function getTypeValue(string $key): ?string
+    public function getTypeValue(\UnitEnum|string $key): ?string
     {
-        return Arr::get($this->config, "database.type_values.{$key}");
+        return $this->findDbValueInMap($this->typeMap, $key);
     }
 
-    public function getPaymentMethodValue(string $key): ?string
+    // ВИПРАВЛЕНО: Тепер приймає і Enum, і string
+    public function getOperationValue(\UnitEnum|string $key): ?string
     {
-        return Arr::get($this->config, "database.method_values.{$key}");
+        return $this->findDbValueInMap($this->operationMap, $key);
     }
 
-    /**
-     * Отримує рядок (status) для бази даних на основі етапу (stage)
-     */
-    public function getStatusByStage(PaymentTypeEnum $type, PaymentStageEnum $stage): ?string
+    public function getStatusByStage(\UnitEnum|string $stage, \UnitEnum|string $type, \UnitEnum|string|null $operation = null): ?string
     {
-        return Arr::get($this->config, "database.statuses.{$type->name}.{$stage->name}");
+        return $this->getCascadingConfig(
+            'database.statuses',
+            $this->nameOf($stage),
+            $this->nameOf($type),
+            $this->nameOf($operation)
+        );
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Drivers & Features
-    |--------------------------------------------------------------------------
-    */
 
     public function getDriverConfig(string $driverName): array
     {
         return Arr::get($this->config, "drivers.{$driverName}", []);
     }
 
-    public function isReuseLinksEnabled(string $driverName): bool
+    public function getLinkLifetime(string $driverName, \UnitEnum|string|null $type = null, \UnitEnum|string|null $operation = null): ?int
     {
-        $driverFeature = Arr::get($this->config, "drivers.{$driverName}.features.reuse_links");
-
-        return is_null($driverFeature)
-            ? (bool) Arr::get($this->config, 'features.reuse_links', false)
-            : (bool) $driverFeature;
-    }
-
-    public function getLinkLifetime(string $driverName): ?int
-    {
-        $driverLifetime = Arr::get($this->config, "drivers.{$driverName}.features.link_lifetime");
-
-        return is_null($driverLifetime)
-            ? Arr::get($this->config, 'features.link_lifetime')
-            : (int) $driverLifetime;
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Events & Enums Resolver
-    |--------------------------------------------------------------------------
-    */
-
-    public function getEventClass(string $key): ?string
-    {
-        return Arr::get($this->config, "events.{$key}");
-    }
-
-    public function resolvePaymentType(string $key): ?PaymentTypeEnum
-    {
-        return $this->resolveEnumFromMapping(
-            PaymentTypeEnum::class,
-            'database.type_values',
-            $key
+        return $this->getCascadingConfig(
+            "drivers.{$driverName}",
+            'features.link_lifetime',
+            $this->nameOf($type),
+            $this->nameOf($operation),
+            Arr::get($this->config, 'features.link_lifetime')
         );
     }
 
-    /**
-     * Перетворює статус із бази (string) назад у внутрішній етап (stage)
-     */
-    public function resolveStageFromStatus(PaymentTypeEnum $type, string $dbStatus): ?PaymentStageEnum
+    public function getEventClass(string $eventName, \UnitEnum|string|null $type = null, \UnitEnum|string|null $operation = null): ?string
     {
-        return $this->resolveEnumFromMapping(
-            PaymentStageEnum::class,
-            "database.statuses.{$type->name}",
-            $dbStatus
+        return $this->getCascadingConfig(
+            'events',
+            $eventName,
+            $this->nameOf($type),
+            $this->nameOf($operation)
         );
+    }
+
+    public function resolvePaymentType(string $key): \UnitEnum|string|null
+    {
+        return $this->typeMap[$key] ?? null;
+    }
+
+    public function resolveOperation(string $dbOperation): \UnitEnum|string|null
+    {
+        return $this->operationMap[$dbOperation] ?? null;
+    }
+
+    public function resolveStageFromStatus(string $dbStatus, \UnitEnum|string|null $type = null, \UnitEnum|string|null $operation = null): \UnitEnum|string|null
+    {
+        $typeStr = $this->nameOf($type);
+        $operationStr = $this->nameOf($operation);
+
+        if ($typeStr && $operationStr && isset($this->stageMap[$typeStr][$operationStr][$dbStatus])) {
+            return $this->stageMap[$typeStr][$operationStr][$dbStatus];
+        }
+
+        if ($typeStr && isset($this->stageMap[$typeStr][$dbStatus])) {
+            return $this->stageMap[$typeStr][$dbStatus];
+        }
+
+        return $this->stageMap['global'][$dbStatus] ?? null;
     }
 
     public function isSaveQuietlyEnabled(): bool
@@ -171,15 +156,94 @@ class Configurator implements ConfiguratorInterface
         return (bool) Arr::get($this->config, 'features.save_quietly', false);
     }
 
-    protected function resolveEnumFromMapping(string $enumClass, string $configPath, string $key, mixed $default = null): mixed
+    protected function getCascadingConfig(string $rootPath, string $key, ?string $typeStr = null, ?string $operationStr = null, mixed $default = null): mixed
     {
-        $mapping = Arr::get($this->config, $configPath, []);
-        $enumName = array_search($key, $mapping, true);
+        $paths = array_filter([
+            $typeStr && $operationStr ? "{$rootPath}.{$typeStr}.{$operationStr}.{$key}" : null,
+            $typeStr ? "{$rootPath}.{$typeStr}.{$key}" : null,
+            "{$rootPath}.{$key}"
+        ]);
 
-        if ($enumName && defined("{$enumClass}::{$enumName}")) {
-            return constant("{$enumClass}::{$enumName}");
+        foreach ($paths as $path) {
+            if (Arr::has($this->config, $path)) {
+                return Arr::get($this->config, $path);
+            }
         }
 
         return $default;
+    }
+
+    protected function buildTypeMap(): void
+    {
+        $mapping = Arr::get($this->config, 'database.type_values', []);
+
+        foreach ($mapping as $enumName => $dbValue) {
+            $default = $enumName ? $enumName : $dbValue;
+            $this->typeMap[$dbValue] = $this->resolveEnum(PaymentTypeEnum::class, $enumName, $default);
+        }
+    }
+
+    protected function buildOperationMap(): void
+    {
+        $mapping = Arr::get($this->config, 'database.operation_values', []);
+
+        foreach ($mapping as $enumName => $dbValue) {
+            $this->operationMap[$dbValue] = $this->resolveEnum(PaymentOperationEnum::class, $enumName, $dbValue);
+        }
+    }
+
+    protected function buildStageMap(): void
+    {
+        $statuses = Arr::get($this->config, 'database.statuses', []);
+
+        foreach ($statuses as $key => $value) {
+            if (!is_array($value)) {
+                $this->stageMap['global'][$value] = $this->resolveEnum(PaymentStageEnum::class, $key, $value);
+                continue;
+            }
+
+            $type = $key;
+            foreach ($value as $subKey => $subValue) {
+                if (is_array($subValue)) {
+                    $operation = $subKey;
+                    foreach ($subValue as $stage => $status) {
+                        $this->stageMap[$type][$operation][$status] = $this->resolveEnum(PaymentStageEnum::class, $stage, $status);
+                    }
+                } else {
+                    $stage = $subKey;
+                    $status = $subValue;
+                    $this->stageMap[$type][$status] = $this->resolveEnum(PaymentStageEnum::class, $stage, $status);
+                }
+            }
+        }
+    }
+
+    protected function findDbValueInMap(array $map, \UnitEnum|string $subject): ?string
+    {
+        $dbValue = array_search($subject, $map, true);
+
+        if ($dbValue !== false) {
+            return (string) $dbValue;
+        }
+
+        if (is_string($subject)) {
+            foreach ($map as $dbKey => $mappedValue) {
+                if ($mappedValue instanceof \UnitEnum && $mappedValue->name === $subject) {
+                    return (string) $dbKey;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    protected function resolveEnum(string $enumClass, string $enumName, mixed $default = null): \UnitEnum|string|null
+    {
+        return defined("{$enumClass}::{$enumName}") ? constant("{$enumClass}::{$enumName}") : $default;
+    }
+
+    protected function nameOf(\UnitEnum|string|null $value): ?string
+    {
+        return $value instanceof \UnitEnum ? $value->name : $value;
     }
 }

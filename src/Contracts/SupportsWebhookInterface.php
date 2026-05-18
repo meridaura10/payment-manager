@@ -6,5 +6,5 @@ use Meridaura\PaymentManager\Drivers\AbstractWebhook;
 
 interface SupportsWebhookInterface
 {
-    public function webhooks(): AbstractWebhook;
+    public function webhook(): AbstractWebhook;
 }

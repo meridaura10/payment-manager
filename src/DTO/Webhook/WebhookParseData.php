@@ -1,6 +1,6 @@
 <?php
 
-namespace Meridaura\PaymentManager\DTO;
+namespace Meridaura\PaymentManager\DTO\Webhook;
 
 use Carbon\Carbon;
 use Meridaura\PaymentManager\Enums\PaymentStageEnum;

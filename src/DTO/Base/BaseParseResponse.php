@@ -1,10 +1,10 @@
 <?php
 
-namespace Meridaura\PaymentManager\DTO;
+namespace Meridaura\PaymentManager\DTO\Base;
 
 use Meridaura\PaymentManager\Enums\PaymentApiResponseStatusEnum;
 
-class PaymentPurchaseApiResponse
+class BaseParseResponse
 {
     public function __construct(
         readonly PaymentApiResponseStatusEnum $status,

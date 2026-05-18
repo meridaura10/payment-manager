@@ -3,6 +3,8 @@
 namespace Meridaura\PaymentManager;
 
 use Illuminate\Support\ServiceProvider;
+use Meridaura\PaymentManager\Console\Commands\InstallCommand;
+use Meridaura\PaymentManager\Console\Commands\MakePaymentHandlerCommand;
 use Meridaura\PaymentManager\Contracts\PaymentManagerInterface;
 use Meridaura\PaymentManager\Support\Configurator\Configurator;
 use Meridaura\PaymentManager\Support\Configurator\ConfiguratorInterface;
@@ -31,7 +33,7 @@ class PaymentServiceProvider extends ServiceProvider
     private function publishLocal(): void
     {
         $this->mergeConfigFrom(
-            __DIR__ . './../config/payment-manager.php', 'payment'
+            __DIR__ . './../config/payment-manager.php', 'payment-manager'
         );
     }
 
@@ -39,7 +41,8 @@ class PaymentServiceProvider extends ServiceProvider
     {
         if ($this->app->runningInConsole()) {
             $this->commands([
-                \Meridaura\PaymentManager\Console\Commands\InstallCommand::class,
+                InstallCommand::class,
+                MakePaymentHandlerCommand::class
             ]);
 
             $this->publishes([
@@ -47,8 +50,12 @@ class PaymentServiceProvider extends ServiceProvider
             ], 'payment-config');
 
             $this->publishes([
-                __DIR__ . '/../stubs/PaymentManagerServiceProvider.stub' => app_path('Providers/PaymentManagerServiceProvider.php'),
+                __DIR__ . '/../stubs/PaymentManagerServiceProvider.php.stub' => app_path('Providers/PaymentManagerServiceProvider.php'),
             ], 'payment-provider');
+
+            $this->publishes([
+                __DIR__.'/../stubs/migrations/create_payments_table.php.stub' => database_path('migrations/' . date('Y_m_d_His', time()) . '_create_payments_table.php'),
+            ], 'payment-migrations');
         }
     }
 }

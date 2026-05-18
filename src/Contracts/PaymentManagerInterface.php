@@ -3,6 +3,8 @@
 namespace Meridaura\PaymentManager\Contracts;
 
 use Meridaura\PaymentManager\Drivers\AbstractCharge;
+use Meridaura\PaymentManager\Drivers\AbstractDriver;
+use Meridaura\PaymentManager\Drivers\AbstractRecurring;
 use Meridaura\PaymentManager\Drivers\AbstractWebhook;
 use Meridaura\PaymentManager\Support\PaymentRepository\PaymentRepositoryInterface;
 
@@ -10,12 +12,12 @@ interface PaymentManagerInterface
 {
     public function extend(string $driver, \Closure $callback): static;
 
-    public function driver(?string $driver = null, array $config = []): PaymentGatewayInterface;
+    public function driver(?string $driver = null, array $config = []): AbstractDriver;
 
-    public function charges(?string $driver = null, array $config = []): AbstractCharge;
+    public function charge(?string $driver = null, array $config = []): AbstractCharge;
 
-    public function recurring(?string $driver = null, array $config = []): GatewayRecurringInterface;
+    public function recurring(?string $driver = null, array $config = []): AbstractRecurring;
 
-    public function webhooks(?string $driver = null, array $config = []): AbstractWebhook;
+    public function webhook(?string $driver = null, array $config = []): AbstractWebhook;
 
 }

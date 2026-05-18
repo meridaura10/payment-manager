@@ -2,7 +2,9 @@
 
 namespace Meridaura\PaymentManager\Contracts;
 
-interface SupportsRecurringInterface extends PaymentGatewayInterface
+use Meridaura\PaymentManager\Drivers\AbstractRecurring;
+
+interface SupportsRecurringInterface
 {
-    public function recurring(): GatewayRecurringInterface;
+    public function recurring(): AbstractRecurring;
 }
