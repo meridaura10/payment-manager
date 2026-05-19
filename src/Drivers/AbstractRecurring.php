@@ -4,7 +4,7 @@ namespace Meridaura\PaymentManager\Drivers;
 
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
-use Meridaura\PaymentManager\DTO\Error;
+use Meridaura\PaymentManager\DTO\PaymentError;
 use Meridaura\PaymentManager\DTO\GatewayRequest;
 use Meridaura\PaymentManager\DTO\Recurring\Execute\RecurringExecuteParseResponse;
 use Meridaura\PaymentManager\DTO\Recurring\Execute\RecurringExecuteRequest;
@@ -72,7 +72,7 @@ abstract class AbstractRecurring
                 payment: $payment,
                 request: $setupRequest,
                 response: null,
-                errors: new Error(
+                errors: new PaymentError(
                     message: __('payment-manager::messages.error_service_unavailable'),
                     systemMessage: 'Internal error during request building or gateway connection.',
                     gatewayMessage: $throwable->getMessage(),
@@ -89,7 +89,7 @@ abstract class AbstractRecurring
                 payment: $payment,
                 request: $setupRequest,
                 response: $parsedSetupResponse,
-                errors: new Error(
+                errors: new PaymentError(
                     message: __('payment-manager::messages.error_invalid_gateway_response'),
                     systemMessage: 'Gateway did not return required data (e.g., page_url or invoice_id).',
                     gatewayMessage: null,
@@ -149,7 +149,7 @@ abstract class AbstractRecurring
                 payment: $payment,
                 request: $executeRequest,
                 response: null,
-                errors: new Error(
+                errors: new PaymentError(
                     message: __('payment-manager::messages.error_service_unavailable'),
                     systemMessage: 'Internal error during execute request building or gateway connection.',
                     gatewayMessage: $throwable->getMessage(),

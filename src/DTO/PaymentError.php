@@ -2,7 +2,7 @@
 
 namespace Meridaura\PaymentManager\DTO;
 
-class Error
+class PaymentError
 {
     public function __construct(
         public readonly string $message,

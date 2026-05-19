@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\Http;
 use Meridaura\PaymentManager\DTO\Charge\ChargePurchaseParseResponse;
 use Meridaura\PaymentManager\DTO\Charge\ChargePurchaseRequest;
 use Meridaura\PaymentManager\DTO\Charge\ChargePurchaseResponse;
-use Meridaura\PaymentManager\DTO\Error;
+use Meridaura\PaymentManager\DTO\PaymentError;
 use Meridaura\PaymentManager\DTO\GatewayRequest;
 use Meridaura\PaymentManager\Enums\PaymentApiResponseStatusEnum;
 use Meridaura\PaymentManager\Enums\PaymentOperationEnum;
@@ -66,7 +66,7 @@ abstract class AbstractCharge
                 payment: $payment,
                 request: $purchaseRequest,
                 response: null,
-                errors: new Error(
+                errors: new PaymentError(
                     message: __('payment-manager::messages.error_service_unavailable'),
                     systemMessage: 'Internal error during request building or gateway connection.',
                     gatewayMessage: $throwable->getMessage(),
@@ -83,7 +83,7 @@ abstract class AbstractCharge
                 payment: $payment,
                 request: $purchaseRequest,
                 response: $parsedPurchaseResponse,
-                errors: new Error(
+                errors: new PaymentError(
                     message: __('payment-manager::messages.error_invalid_gateway_response'),
                     systemMessage: 'Gateway did not return required data (e.g., page_url or invoice_id).',
                     gatewayMessage: null,

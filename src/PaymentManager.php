@@ -6,26 +6,20 @@ use Closure;
 use Illuminate\Contracts\Container\Container;
 use InvalidArgumentException;
 use Meridaura\PaymentManager\Contracts\PaymentManagerInterface;
-use Meridaura\PaymentManager\Contracts\SupportsChargeInterface;
-use Meridaura\PaymentManager\Contracts\SupportsRecurringInterface;
-use Meridaura\PaymentManager\Contracts\SupportsWebhookInterface;
 use Meridaura\PaymentManager\Drivers\AbstractCharge;
 use Meridaura\PaymentManager\Drivers\AbstractDriver;
 use Meridaura\PaymentManager\Drivers\AbstractRecurring;
 use Meridaura\PaymentManager\Drivers\AbstractWebhook;
+use Meridaura\PaymentManager\Drivers\Contracts\SupportsChargeInterface;
+use Meridaura\PaymentManager\Drivers\Contracts\SupportsRecurringInterface;
+use Meridaura\PaymentManager\Drivers\Contracts\SupportsWebhookInterface;
 use Meridaura\PaymentManager\Exceptions\PaymentGatewayException;
 use Meridaura\PaymentManager\Support\Configurator\ConfiguratorInterface;
 
 class PaymentManager implements PaymentManagerInterface
 {
-    /**
-     * Масив створених екземплярів драйверів (Singleton pattern).
-     */
     protected array $drivers = [];
 
-    /**
-     * Масив кастомних замикань для створення драйверів.
-     */
     protected array $customCreators = [];
 
     public function __construct(
@@ -33,9 +27,6 @@ class PaymentManager implements PaymentManagerInterface
     ) {
     }
 
-    /**
-     * Реєстрація нового драйвера.
-     */
     public function extend(string $driver, Closure $callback): static
     {
         $this->customCreators[$driver] = $callback;
@@ -56,9 +47,6 @@ class PaymentManager implements PaymentManagerInterface
         return $gateway->webhook()->setDriver($gateway);
     }
 
-    /**
-     * @throws PaymentGatewayException
-     */
     public function charge(?string $driver = null, array $config = []): AbstractCharge
     {
         $gateway = $this->driver($driver, $config);
@@ -72,9 +60,6 @@ class PaymentManager implements PaymentManagerInterface
         return $gateway->charge()->setGatewayName($gateway::getGatewayName());
     }
 
-    /**
-     * @throws PaymentGatewayException
-     */
     public function recurring(?string $driver = null, array $config = []): AbstractRecurring
     {
         $gateway = $this->driver($driver, $config);
@@ -113,5 +98,31 @@ class PaymentManager implements PaymentManagerInterface
         $mergedConfig = array_merge($defaultConfig, $config);
 
         return $this->customCreators[$driver]($mergedConfig);
+    }
+
+    public function __call(string $method, array $parameters): mixed
+    {
+        $driverName = $parameters[0] ?? null;
+        $config = $parameters[1] ?? [];
+
+        $gateway = $this->driver($driverName, $config);
+
+        if (!method_exists($gateway, $method)) {
+            throw new \BadMethodCallException(
+                sprintf('Driver [%s] does not support method [%s].', get_class($gateway), $method)
+            );
+        }
+
+        $handler = $gateway->$method();
+
+        if (method_exists($handler, 'setGatewayName')) {
+            $handler->setGatewayName($gateway::getGatewayName());
+        }
+
+        if (method_exists($handler, 'setDriver')) {
+            $handler->setDriver($gateway);
+        }
+
+        return $handler;
     }
 }

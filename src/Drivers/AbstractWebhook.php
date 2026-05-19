@@ -4,7 +4,7 @@ namespace Meridaura\PaymentManager\Drivers;
 
 use Carbon\Carbon;
 use Meridaura\PaymentManager\Contracts\HandlesPaymentTypeWebhookInterface;
-use Meridaura\PaymentManager\DTO\Error;
+use Meridaura\PaymentManager\DTO\PaymentError;
 use Meridaura\PaymentManager\DTO\Webhook\WebhookParseData;
 use Meridaura\PaymentManager\DTO\Webhook\WebhookResponse;
 use Meridaura\PaymentManager\Enums\PaymentStageEnum;
@@ -63,7 +63,7 @@ abstract class AbstractWebhook
         return new WebhookResponse(payment: $payment, parseData: $data);
     }
 
-    protected function beforeHooks(Payment $payment, WebhookParseData $data, \UnitEnum|string $type, \UnitEnum|string|null $operation, ?object $typeHandlerClass = null): ?Error
+    protected function beforeHooks(Payment $payment, WebhookParseData $data, \UnitEnum|string $type, \UnitEnum|string|null $operation, ?object $typeHandlerClass = null): ?PaymentError
     {
         $typeStr = $type instanceof \UnitEnum ? $type->name : $type;
         $hookMethod = 'webhookBefore' . ucfirst(strtolower($typeStr)) . 'Handler';
@@ -73,19 +73,14 @@ abstract class AbstractWebhook
         foreach ($targets as $target) {
             if (method_exists($target, $hookMethod)) {
                 $error = $target->{$hookMethod}($payment, $data, $operation);
-                if ($error instanceof Error) return $error;
+                if ($error instanceof PaymentError) return $error;
             }
-
-//            if (method_exists($target, 'webhookBeforeHandler')) {
-//                $error = $target->webhookBeforeHandler($payment, $data, $type, $operation);
-//                if ($error instanceof Error) return $error;
-//            }
         }
 
         return null;
     }
 
-    protected function afterHooks(Payment $payment, WebhookParseData $data, \UnitEnum|string $type, \UnitEnum|string|null $operation, ?object $typeHandlerClass = null): ?Error
+    protected function afterHooks(Payment $payment, WebhookParseData $data, \UnitEnum|string $type, \UnitEnum|string|null $operation, ?object $typeHandlerClass = null): ?PaymentError
     {
         $typeStr = $type instanceof \UnitEnum ? $type->name : $type;
         $hookMethod = 'webhookAfter' . ucfirst(strtolower($typeStr)) . 'Handler';
@@ -95,13 +90,8 @@ abstract class AbstractWebhook
         foreach ($targets as $target) {
             if (method_exists($target, $hookMethod)) {
                 $error = $target->{$hookMethod}($payment, $data, $operation);
-                if ($error instanceof Error) return $error;
+                if ($error instanceof PaymentError) return $error;
             }
-
-//            if (method_exists($target, 'webhookAfterHandler')) {
-//                $error = $target->webhookAfterHandler($payment, $data, $type, $operation);
-//                if ($error instanceof Error) return $error;
-//            }
         }
 
         return null;
@@ -208,7 +198,7 @@ abstract class AbstractWebhook
         return new WebhookResponse(
             payment: null,
             parseData: $data,
-            error: new Error(__("payment-manager::messages.{$messageKey}", $replace))
+            error: new PaymentError(__("payment-manager::messages.{$messageKey}", $replace))
         );
     }
 

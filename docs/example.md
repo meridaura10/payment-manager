@@ -20,7 +20,7 @@ $response = \Meridaura\PaymentManager\Facades\PaymentManager::charge($gateway)->
 Буде повернено спеціалізований dto клас який може містити в собі типізовану помилку для зручного логування та виведення
 
 Приклад кастомного обробника заданого в драйвері
-$response = \Meridaura\PaymentManager\Facades\PaymentManager::driver($gateway)->subscription()->setup($data);
+$response = \Meridaura\PaymentManager\Facades\PaymentManager::subscription($gateway)->setup($data);
 
 Приклад виконристання для вебхука
 $response = \Meridaura\PaymentManager\Facades\PaymentManager::webhook($gateway)->handle($request->all());

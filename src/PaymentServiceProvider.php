@@ -4,7 +4,6 @@ namespace Meridaura\PaymentManager;
 
 use Illuminate\Support\ServiceProvider;
 use Meridaura\PaymentManager\Console\Commands\InstallCommand;
-use Meridaura\PaymentManager\Console\Commands\MakePaymentHandlerCommand;
 use Meridaura\PaymentManager\Contracts\PaymentManagerInterface;
 use Meridaura\PaymentManager\Support\Configurator\Configurator;
 use Meridaura\PaymentManager\Support\Configurator\ConfiguratorInterface;
@@ -42,7 +41,7 @@ class PaymentServiceProvider extends ServiceProvider
         if ($this->app->runningInConsole()) {
             $this->commands([
                 InstallCommand::class,
-                MakePaymentHandlerCommand::class
+//                MakePaymentHandlerCommand::class
             ]);
 
             $this->publishes([

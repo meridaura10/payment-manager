@@ -1,4 +1,7 @@
-# Налаштування конфігу
+# Налаштування конфігурації
+
+Мапінг БД, кастомні статуси та події платежу.
+
 ```php
 <?php
 
@@ -210,33 +213,11 @@ return [
         // Вищий пріоритет - по типу
         PaymentTypeEnum::CHARGE->name => [
             PaymentEventEnum::STATUS_CHANGED->name => null,
-
+            PaymentStageEnum::CREATED->name => null,
+            PaymentStageEnum::PENDING->name => null,
+            
             // Найвищий пріоритет - по типу операції
             PaymentOperationEnum::CHARGE_PURCHASE->name => [
-                PaymentStageEnum::CREATED->name => null,
-                PaymentStageEnum::PENDING->name => null,
-                PaymentStageEnum::PAID->name => null,
-                PaymentStageEnum::FAILED->name => null,
-                PaymentStageEnum::CANCELED->name => null,
-                PaymentEventEnum::STATUS_CHANGED->name => null,
-            ],
-        ],
-
-        PaymentTypeEnum::RECURRING->name => [
-            PaymentEventEnum::STATUS_CHANGED->name => null,
-
-            PaymentOperationEnum::RECURRING_SETUP->name => [
-                PaymentStageEnum::CREATED->name => null,
-                PaymentStageEnum::PENDING->name => null,
-                PaymentStageEnum::PAID->name => null,
-                PaymentStageEnum::FAILED->name => null,
-                PaymentStageEnum::CANCELED->name => null,
-                PaymentEventEnum::STATUS_CHANGED->name => null,
-            ],
-
-            PaymentOperationEnum::RECURRING_EXECUTE->name => [
-                PaymentStageEnum::CREATED->name => null,
-                PaymentStageEnum::PENDING->name => null,
                 PaymentStageEnum::PAID->name => null,
                 PaymentStageEnum::FAILED->name => null,
                 PaymentStageEnum::CANCELED->name => null,

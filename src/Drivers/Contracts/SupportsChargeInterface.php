@@ -1,6 +1,6 @@
 <?php
 
-namespace Meridaura\PaymentManager\Contracts;
+namespace Meridaura\PaymentManager\Drivers\Contracts;
 
 use Meridaura\PaymentManager\Drivers\AbstractCharge;
 

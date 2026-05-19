@@ -1,9 +1,10 @@
 # Створення нового драйвера для плітіжних систем
 
 1. Створюємо клас та наслідуємось від AbstractDriver
-2. Щоб подалі виокристовувати класи зручно через функції хелпери визначаємо для драйвера його можливості задопомогою інтерфейсів SupportsChargeInterface, SupportsWebhookInterface, SupportsRecurringInterface
-3. При виклику стандартних функцій обробників від пакету туди буде автоматично передано назву драйвера
-4. Якщо створенно кастомний обробник потипу subscription туди треба передавати назву самостійно як це показано нище
+2. Щоб подалі виокристовувати класи зручно через функції хелпери визначаємо для драйвера його можливості задопомогою інтерфейсів.
+   SupportsChargeInterface, SupportsWebhookInterface, SupportsRecurringInterface
+3. При виклику обробників напряму туди автоматично передасться назва драйвера або ж сам драйвер для вебхука
+4. При створені класних обробників краще ознайомитись з кодом нище
 
 ```php
 <?php
@@ -11,13 +12,7 @@
 namespace App\Services\PaymentManager\PaymentDrivers\Monobank;
 
 
-use Meridaura\PaymentManager\Contracts\SupportsChargeInterface;
-use Meridaura\PaymentManager\Contracts\SupportsRecurringInterface;
-use Meridaura\PaymentManager\Contracts\SupportsWebhookInterface;
-use Meridaura\PaymentManager\Drivers\AbstractCharge;
-use Meridaura\PaymentManager\Drivers\AbstractDriver;
-use Meridaura\PaymentManager\Drivers\AbstractRecurring;
-use Meridaura\PaymentManager\Drivers\AbstractWebhook;
+use Meridaura\PaymentManager\Drivers\AbstractCharge;use Meridaura\PaymentManager\Drivers\AbstractDriver;use Meridaura\PaymentManager\Drivers\AbstractRecurring;use Meridaura\PaymentManager\Drivers\AbstractWebhook;use Meridaura\PaymentManager\Drivers\Contracts\SupportsChargeInterface;use Meridaura\PaymentManager\Drivers\Contracts\SupportsRecurringInterface;use Meridaura\PaymentManager\Drivers\Contracts\SupportsWebhookInterface;
 
 class MonobankDriver extends AbstractDriver implements SupportsChargeInterface, SupportsWebhookInterface, SupportsRecurringInterface
 {
@@ -47,10 +42,21 @@ class MonobankDriver extends AbstractDriver implements SupportsChargeInterface, 
         return new MonobankWebhook($this->config);
     }
 
-    // приклад додвання кастомного методу-обробника
+    приклад додвання кастомного методу-обробника
+    він буде доступний як і усі інші обробники але ide про нього не знає
     public function subscription(): MonobankSubscription
     {
-        return (new MonobankSubscription($this->config))->setGatewayName($this->getGatewayName());
+        return new MonobankSubscription($this->config);
+    }
+    
+    Щоб коректно працювали хуки в вебхуці важливо визначити кастомні обробники тут
+    Ключ це те що ви вказали в config як як type значення сама функція обробника
+    public function getCustomTypeClass(\UnitEnum|string $type): mixed
+    {
+        return match ($type) {
+            Payment::TYPE_SUBSCRIPTION => $this->subscription(),
+            default => null,
+        };
     }
 
     public static function getGatewayName(): string

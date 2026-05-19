@@ -19,7 +19,7 @@ class InstallCommand extends Command
      *
      * @var string
      */
-    protected $description = 'Install the Payment Manager package (publishes config and ServiceProvider)';
+    protected $description = 'Install the Payment Manager package (publishes config, migrate and ServiceProvider)';
 
     /**
      * Execute the console command.

@@ -35,12 +35,12 @@ class PaymentManagerServiceProvider extends ServiceProvider
          * GLOBAL DEFAULT
          * Applies to any type and operation unless explicitly overridden below.
          */
-        Задається глобальний для усіх типів та операцій
-        Найнищий пріорітет
+        Задається глобально для всіх типів та операцій
+        Найнижчий пріоритет
         $repository->setDefaultCreator(
             callback: function (mixed $dto, array $paymentData = []) {
                 return Payment::query()->firstOrCreate([
-                    масив paymentData містить ключі які були задані в конфігурації
+                    Масив paymentData містить ключі, які були визначені в конфігурації
                 
                     'gateway'   => $paymentData['gateway'] ?? null,
                     'type'    => $paymentData['type'] ?? null,
@@ -54,8 +54,8 @@ class PaymentManagerServiceProvider extends ServiceProvider
             }
         );
         
-        Можна задавати окремо для типу чи типів та їх операцій
-        Якщо задано просто тип це другий пріорітет якщо в цього типу ще є операція це найвищий пріорітет (третій)
+        Можна визначати окремо для типу (або кількох типів) та їхніх операцій
+        Якщо задано лише тип — це середній пріоритет, якщо для цього типу вказано ще й операцію — це найвищий пріоритет
         $repository->setDefaultCreator(
             callback: function (ChargePurchaseRequest $dto, array $paymentData = []) {},
             type: ['charge'],
@@ -68,12 +68,11 @@ class PaymentManagerServiceProvider extends ServiceProvider
      */
     protected function registerCustomDrivers(PaymentManagerInterface $paymentManager): void
     {
-        Регеструємо свої драйвери для роботи з платіжками
-        Краще передавати конфіг або ж можна просто його оприділяти в самому класі
+        Реєструємо власні драйвери для роботи з платіжними системами
+        Конфіг можна передавати під час реєстрації або ж визначати безпосередньо в самому класі
         // $paymentManager->extend('custom_gateway', function (array $config = []) {
         //     return new \App\PaymentHandlers\CustomGatewayDriver($config);
         // });
     }
 }
-
 ```

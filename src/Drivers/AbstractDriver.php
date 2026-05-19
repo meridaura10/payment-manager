@@ -3,8 +3,8 @@
 namespace Meridaura\PaymentManager\Drivers;
 
 use Illuminate\Support\Arr;
-use Meridaura\PaymentManager\Contracts\SupportsChargeInterface;
-use Meridaura\PaymentManager\Contracts\SupportsRecurringInterface;
+use Meridaura\PaymentManager\Drivers\Contracts\SupportsChargeInterface;
+use Meridaura\PaymentManager\Drivers\Contracts\SupportsRecurringInterface;
 use Meridaura\PaymentManager\Enums\PaymentTypeEnum;
 
 abstract class AbstractDriver
