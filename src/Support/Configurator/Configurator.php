@@ -82,8 +82,7 @@ class Configurator implements ConfiguratorInterface
     {
         return $this->findDbValueInMap($this->typeMap, $key);
     }
-
-    // ВИПРАВЛЕНО: Тепер приймає і Enum, і string
+    
     public function getOperationValue(\UnitEnum|string $key): ?string
     {
         return $this->findDbValueInMap($this->operationMap, $key);
@@ -148,7 +147,7 @@ class Configurator implements ConfiguratorInterface
             return $this->stageMap[$typeStr][$dbStatus];
         }
 
-        return $this->stageMap['global'][$dbStatus] ?? null;
+        return $this->stageMap['*'][$dbStatus] ?? null;
     }
 
     public function isSaveQuietlyEnabled(): bool
@@ -178,7 +177,14 @@ class Configurator implements ConfiguratorInterface
         $mapping = Arr::get($this->config, 'database.type_values', []);
 
         foreach ($mapping as $enumName => $dbValue) {
-            $default = $enumName ? $enumName : $dbValue;
+            $default = $enumName ?: $dbValue;
+
+            if (isset($this->typeMap[$dbValue])) {
+                throw new \InvalidArgumentException(
+                    sprintf("Configuration error: Duplicate database value '%s' found in 'database.type_values'. Database mapping values must be strictly unique.", $dbValue)
+                );
+            }
+
             $this->typeMap[$dbValue] = $this->resolveEnum(PaymentTypeEnum::class, $enumName, $default);
         }
     }
@@ -188,6 +194,12 @@ class Configurator implements ConfiguratorInterface
         $mapping = Arr::get($this->config, 'database.operation_values', []);
 
         foreach ($mapping as $enumName => $dbValue) {
+            if (isset($this->operationMap[$dbValue])) {
+                throw new \InvalidArgumentException(
+                    sprintf("Configuration error: Duplicate database value '%s' found in 'database.operation_values'. Database mapping values must be strictly unique.", $dbValue)
+                );
+            }
+
             $this->operationMap[$dbValue] = $this->resolveEnum(PaymentOperationEnum::class, $enumName, $dbValue);
         }
     }
@@ -198,7 +210,7 @@ class Configurator implements ConfiguratorInterface
 
         foreach ($statuses as $key => $value) {
             if (!is_array($value)) {
-                $this->stageMap['global'][$value] = $this->resolveEnum(PaymentStageEnum::class, $key, $value);
+                $this->stageMap['*'][$value] = $this->resolveEnum(PaymentStageEnum::class, $key, $value);
                 continue;
             }
 

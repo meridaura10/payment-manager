@@ -8,5 +8,4 @@ enum PaymentStageEnum
     case PENDING;
     case PAID;
     case FAILED;
-    case CANCELED;
 }

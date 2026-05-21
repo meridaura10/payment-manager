@@ -35,14 +35,14 @@ return [
         ],
 
         'type_values' => [
-            PaymentTypeEnum::CHARGE->name => 'manual',
+            PaymentTypeEnum::CHARGE->name => 'charge',
             PaymentTypeEnum::RECURRING->name => 'recurring',
         ],
 
         'operation_values' => [
-            PaymentOperationEnum::CHARGE_PURCHASE->name => 'purchase',
-            PaymentOperationEnum::RECURRING_SETUP->name => 'setup',
-            PaymentOperationEnum::RECURRING_EXECUTE->name => 'execute',
+            PaymentOperationEnum::CHARGE_PURCHASE->name => 'charge_purchase',
+            PaymentOperationEnum::RECURRING_SETUP->name => 'recurring_setup',
+            PaymentOperationEnum::RECURRING_EXECUTE->name => 'recurring_execute',
         ],
 
         /*
@@ -56,7 +56,6 @@ return [
                 PaymentStageEnum::PENDING->name => 'pending',
                 PaymentStageEnum::PAID->name => 'paid',
                 PaymentStageEnum::FAILED->name => 'error',
-                PaymentStageEnum::CANCELED->name => 'expired',
 
                 // Specific operation overrides
                 PaymentOperationEnum::CHARGE_PURCHASE->name => [
@@ -70,7 +69,6 @@ return [
                 PaymentStageEnum::PENDING->name => 'pending',
                 PaymentStageEnum::PAID->name => 'paid',
                 PaymentStageEnum::FAILED->name => 'error',
-                PaymentStageEnum::CANCELED->name => 'expired',
 
                 // Override for saving card
                 PaymentOperationEnum::RECURRING_SETUP->name => [
@@ -152,7 +150,6 @@ return [
                 PaymentStageEnum::PENDING->name => null,
                 PaymentStageEnum::PAID->name => null,
                 PaymentStageEnum::FAILED->name => null,
-                PaymentStageEnum::CANCELED->name => null,
                 PaymentEventEnum::STATUS_CHANGED->name => null,
             ],
         ],
@@ -165,7 +162,6 @@ return [
                 PaymentStageEnum::PENDING->name => null,
                 PaymentStageEnum::PAID->name => null,
                 PaymentStageEnum::FAILED->name => null,
-                PaymentStageEnum::CANCELED->name => null,
                 PaymentEventEnum::STATUS_CHANGED->name => null,
             ],
 
@@ -174,7 +170,6 @@ return [
                 PaymentStageEnum::PENDING->name => null,
                 PaymentStageEnum::PAID->name => null,
                 PaymentStageEnum::FAILED->name => null,
-                PaymentStageEnum::CANCELED->name => null,
                 PaymentEventEnum::STATUS_CHANGED->name => null,
             ],
         ],

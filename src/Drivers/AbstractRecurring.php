@@ -63,7 +63,7 @@ abstract class AbstractRecurring
         try {
             $gatewayRequest = $this->buildSetupRequest($setupRequest, $payment);
             $httpResponse = $this->sendHttpRequest($gatewayRequest);
-            $parsedSetupResponse = $this->parseSetupResponse($httpResponse, $payment);
+            $parsedSetupResponse = $this->parseSetupResponse($httpResponse, $setupRequest, $payment);
         } catch (\Throwable $throwable) {
             $this->markPaymentAsFailed($payment, $operation);
 
@@ -140,7 +140,7 @@ abstract class AbstractRecurring
         try {
             $gatewayRequest = $this->buildExecuteRequest($executeRequest, $payment);
             $httpResponse = $this->sendHttpRequest($gatewayRequest);
-            $parsedExecuteResponse = $this->parseExecuteResponse($httpResponse, $payment);
+            $parsedExecuteResponse = $this->parseExecuteResponse($httpResponse, $executeRequest, $payment);
         } catch (\Throwable $throwable) {
             $this->markPaymentAsFailed($payment, $operation);
 
@@ -285,9 +285,9 @@ abstract class AbstractRecurring
 
     abstract protected function buildSetupRequest(RecurringSetupRequest $request, Payment $payment): GatewayRequest;
 
-    abstract protected function parseSetupResponse(Response $response, Payment $payment): RecurringSetupParseResponse;
+    abstract protected function parseSetupResponse(Response $response, RecurringSetupRequest $request, Payment $payment): RecurringSetupParseResponse;
 
     abstract protected function buildExecuteRequest(RecurringExecuteRequest $request, Payment $payment): GatewayRequest;
 
-    abstract protected function parseExecuteResponse(Response $response, Payment $payment): RecurringExecuteParseResponse;
+    abstract protected function parseExecuteResponse(Response $response, RecurringExecuteRequest $request, Payment $payment): RecurringExecuteParseResponse;
 }

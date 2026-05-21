@@ -99,7 +99,6 @@ return [
             PaymentStageEnum::PENDING->name => 'pending',
             PaymentStageEnum::PAID->name => 'paid',
             PaymentStageEnum::FAILED->name => 'error',
-            PaymentStageEnum::CANCELED->name => 'expired',
             
             // 1. CHARGE DEFAULTS
             // Вищий пріоритет - вказуємо для конкретного типу
@@ -108,7 +107,6 @@ return [
                 PaymentStageEnum::PENDING->name => 'pending',
                 PaymentStageEnum::PAID->name => 'paid',
                 PaymentStageEnum::FAILED->name => 'error',
-                PaymentStageEnum::CANCELED->name => 'expired',
 
                 // Specific operation overrides
                 // Найвищий пріоритет - вказуємо для конкретної операції
@@ -123,7 +121,6 @@ return [
                 PaymentStageEnum::PENDING->name => 'pending',
                 PaymentStageEnum::PAID->name => 'paid',
                 PaymentStageEnum::FAILED->name => 'error',
-                PaymentStageEnum::CANCELED->name => 'expired',
 
                 // Override for saving card
                 PaymentOperationEnum::RECURRING_SETUP->name => [
@@ -220,7 +217,6 @@ return [
             PaymentOperationEnum::CHARGE_PURCHASE->name => [
                 PaymentStageEnum::PAID->name => null,
                 PaymentStageEnum::FAILED->name => null,
-                PaymentStageEnum::CANCELED->name => null,
                 PaymentEventEnum::STATUS_CHANGED->name => null,
             ],
         ],

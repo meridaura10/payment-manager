@@ -12,6 +12,8 @@ interface PaymentManagerInterface
 {
     public function extend(string $driver, \Closure $callback): static;
 
+    public function existsDriver(string $driver, string $supportInterface = null): bool;
+
     public function driver(?string $driver = null, array $config = []): AbstractDriver;
 
     public function charge(?string $driver = null, array $config = []): AbstractCharge;

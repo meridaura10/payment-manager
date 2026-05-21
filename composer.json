@@ -19,7 +19,7 @@
                 "Meridaura\\PaymentManager\\PaymentServiceProvider"
             ],
             "aliases": {
-                "Payment": "Meridaura\\PaymentManager\\Facades\\PaymentManager"
+                "PaymentManager": "Meridaura\\PaymentManager\\Facades\\PaymentManager"
             }
         }
     },

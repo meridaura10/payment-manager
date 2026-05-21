@@ -34,6 +34,21 @@ class PaymentManager implements PaymentManagerInterface
         return $this;
     }
 
+    public function existsDriver(string $driver, string $supportInterface = null): bool
+    {
+        $driver = $this->drivers[$driver] ?? null;
+
+        if (is_null($driver)) {
+            return false;
+        }
+
+        if ($supportInterface) {
+            return $driver instanceof $supportInterface;
+        }
+
+        return true;
+    }
+
     public function webhook(?string $driver = null, array $config = []): AbstractWebhook
     {
         $gateway = $this->driver($driver, $config);

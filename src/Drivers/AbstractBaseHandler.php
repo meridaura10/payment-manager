@@ -4,9 +4,7 @@ namespace Meridaura\PaymentManager\Drivers;
 
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
-use Meridaura\PaymentManager\DTO\Base\BaseParseResponse;
 use Meridaura\PaymentManager\DTO\GatewayRequest;
-use Meridaura\PaymentManager\DTO\Recurring\Execute\RecurringExecuteParseResponse;
 use Meridaura\PaymentManager\Enums\PaymentApiResponseStatusEnum;
 use Meridaura\PaymentManager\Enums\PaymentStageEnum;
 use Meridaura\PaymentManager\Models\Payment;
@@ -19,8 +17,6 @@ abstract class AbstractBaseHandler
     private ?string $gatewayName = null;
 
     protected \UnitEnum|string $paymentType = 'custom';
-
-    protected \UnitEnum|string $operation = 'custom';
 
     protected function getValidReusableSetupUrl(Payment $payment, \UnitEnum|string $operation): ?string
     {
@@ -77,7 +73,7 @@ abstract class AbstractBaseHandler
             ->send($gatewayRequest->method, $gatewayRequest->url, [$gatewayRequest->encoding => $gatewayRequest->payload]);
     }
 
-    protected function handleSuccessfulSetupResponse(Payment $payment, BaseParseResponse $response, \UnitEnum|string $operation): void
+    protected function handleSuccessfulSetupResponse(Payment $payment, mixed $response, \UnitEnum|string $operation): void
     {
         $lifetimeSeconds = $this->configurator()->getLinkLifetime($this->getGatewayName(), $this->paymentType, $operation);
 
@@ -94,22 +90,22 @@ abstract class AbstractBaseHandler
         $this->events()->dispatchLifecycleStage($payment, PaymentStageEnum::PENDING, $operation);
     }
 
-    protected function handleSuccessfulExecuteResponse(Payment $payment, RecurringExecuteParseResponse $parsedExecuteResponse, \UnitEnum|string $operation): void
+    protected function handleSuccessfulExecuteResponse(Payment $payment, mixed $parseResponse, \UnitEnum|string $operation): void
     {
         $lifetimeSeconds = $this->configurator()->getLinkLifetime($this->getGatewayName(), $this->paymentType, $operation);
 
         $this->repository()->update($payment, [
-            $this->configurator()->getResponseColumn() => $parsedExecuteResponse->data,
-            $this->configurator()->getPageUrlColumn() => $parsedExecuteResponse->page_url,
+            $this->configurator()->getResponseColumn() => $parseResponse->data,
+            $this->configurator()->getPageUrlColumn() => $parseResponse->page_url,
             $this->configurator()->getExpiresAtColumn() => $lifetimeSeconds ? now()->addSeconds($lifetimeSeconds) : null,
             $this->configurator()->getStageColumn() => $this->configurator()->getStatusByStage(PaymentStageEnum::PAID, $this->paymentType, $operation),
-            $this->configurator()->getExternIdColumn() => $parsedExecuteResponse->invoice_id ?? $this->repository()->getAttribute($payment, $this->configurator()->getExternIdColumn()),
+            $this->configurator()->getExternIdColumn() => $parseResponse->invoice_id ?? $this->repository()->getAttribute($payment, $this->configurator()->getExternIdColumn()),
         ]);
 
         $this->events()->dispatchLifecycleStage($payment, PaymentStageEnum::PAID, $operation);
     }
 
-    protected function isValidSetupResponse(BaseParseResponse $response): bool
+    protected function isValidSetupResponse(mixed $response): bool
     {
         if ($response->status === PaymentApiResponseStatusEnum::ERROR || empty($response->page_url)) {
             return false;

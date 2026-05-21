@@ -57,7 +57,7 @@ abstract class AbstractCharge
         try {
             $gatewayRequest = $this->buildPurchaseRequest($purchaseRequest, $payment);
             $httpResponse = $this->sendHttpRequest($gatewayRequest);
-            $parsedPurchaseResponse = $this->parsePurchaseResponse($httpResponse, $payment);
+            $parsedPurchaseResponse = $this->parsePurchaseResponse($httpResponse, $purchaseRequest, $payment);
         } catch (\Throwable $throwable) {
             $this->markPaymentAsFailed($payment);
 
@@ -177,7 +177,11 @@ abstract class AbstractCharge
 
     protected function isValidPurchaseResponse(ChargePurchaseParseResponse $parsedPurchaseResponse): bool
     {
-        if ($parsedPurchaseResponse->status === PaymentApiResponseStatusEnum::ERROR || empty($parsedPurchaseResponse->page_url)) {
+        if ($parsedPurchaseResponse->status === PaymentApiResponseStatusEnum::ERROR) {
+            return false;
+        }
+
+        if (empty($parsedPurchaseResponse->page_url) && empty($parsedPurchaseResponse->html_form)) {
             return false;
         }
 
@@ -198,5 +202,5 @@ abstract class AbstractCharge
 
     abstract protected function buildPurchaseRequest(ChargePurchaseRequest $request, Payment $payment): GatewayRequest;
 
-    abstract protected function parsePurchaseResponse(Response $response, Payment $payment): ChargePurchaseParseResponse;
+    abstract protected function parsePurchaseResponse(Response $response, ChargePurchaseRequest $purchaseRequest, Payment $payment): ChargePurchaseParseResponse;
 }
