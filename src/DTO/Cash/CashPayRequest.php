@@ -10,8 +10,8 @@ class CashPayRequest
         readonly public Model $payable,
         readonly public string|int $currency,
         readonly public float $amount,
-        public readonly \UnitEnum|string $type,
-        public readonly \UnitEnum|string $gateway,
+        public readonly \UnitEnum|string|null $type = null,
+        public readonly \UnitEnum|string|null $gateway = null,
         readonly public array $driverData = [],
         readonly public array $paymentData = [],
     ) {

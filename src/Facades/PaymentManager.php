@@ -4,6 +4,7 @@ namespace Meridaura\PaymentManager\Facades;
 
 use Illuminate\Support\Facades\Facade;
 use Meridaura\PaymentManager\Contracts\PaymentManagerInterface;
+use Meridaura\PaymentManager\Drivers\AbstractCash;
 
 /**
  * @method static \Meridaura\PaymentManager\PaymentManager extend(string $driver, \Closure $callback)
@@ -12,6 +13,7 @@ use Meridaura\PaymentManager\Contracts\PaymentManagerInterface;
  * @method static \Meridaura\PaymentManager\Drivers\AbstractWebhook webhook(?string $driver = null, array $config = [])
  * @method static \Meridaura\PaymentManager\Drivers\AbstractDriver driver(?string $driver = null, array $config = [])
  * @method static \Meridaura\PaymentManager\Drivers\AbstractDriver build(string $driver, array $config = [])
+ * @method static \Meridaura\PaymentManager\Drivers\AbstractCash cash(?string $driver = null, array $config = [])
  * @method static bool existsDriver(string $driver, string $supportInterface = null)
  *
  * @see \Meridaura\PaymentManager\PaymentManager

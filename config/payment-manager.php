@@ -37,6 +37,7 @@ return [
         'type_values' => [
             PaymentTypeEnum::CHARGE->name => 'charge',
             PaymentTypeEnum::RECURRING->name => 'recurring',
+            PaymentTypeEnum::CASH->name => 'cash',
         ],
 
         'operation_values' => [

@@ -6,10 +6,12 @@ use Closure;
 use Illuminate\Contracts\Container\Container;
 use InvalidArgumentException;
 use Meridaura\PaymentManager\Contracts\PaymentManagerInterface;
+use Meridaura\PaymentManager\Drivers\AbstractCash;
 use Meridaura\PaymentManager\Drivers\AbstractCharge;
 use Meridaura\PaymentManager\Drivers\AbstractDriver;
 use Meridaura\PaymentManager\Drivers\AbstractRecurring;
 use Meridaura\PaymentManager\Drivers\AbstractWebhook;
+use Meridaura\PaymentManager\Drivers\Contracts\SupportsCashInterface;
 use Meridaura\PaymentManager\Drivers\Contracts\SupportsChargeInterface;
 use Meridaura\PaymentManager\Drivers\Contracts\SupportsRecurringInterface;
 use Meridaura\PaymentManager\Drivers\Contracts\SupportsWebhookInterface;
@@ -36,17 +38,21 @@ class PaymentManager implements PaymentManagerInterface
 
     public function existsDriver(string $driver, string $supportInterface = null): bool
     {
-        $driver = $this->drivers[$driver] ?? null;
-
-        if (is_null($driver)) {
+        if (!isset($this->drivers[$driver]) && !isset($this->customCreators[$driver])) {
             return false;
         }
 
-        if ($supportInterface) {
-            return $driver instanceof $supportInterface;
+        if (is_null($supportInterface)) {
+            return true;
         }
 
-        return true;
+        try {
+            $driverInstance = $this->driver($driver);
+
+            return $driverInstance instanceof $supportInterface;
+        } catch (\Throwable $e) {
+            return false;
+        }
     }
 
     public function webhook(?string $driver = null, array $config = []): AbstractWebhook
@@ -86,6 +92,19 @@ class PaymentManager implements PaymentManagerInterface
         }
 
         return $gateway->recurring()->setGatewayName($gateway::getGatewayName());
+    }
+
+    public function cash(?string $driver = null, array $config = []): AbstractCash
+    {
+        $gateway = $this->driver($driver, $config);
+
+        if (!$gateway instanceof SupportsCashInterface) {
+            throw new PaymentGatewayException(
+                sprintf('Driver [%s] does not support cash payment.', get_class($gateway))
+            );
+        }
+
+        return $gateway->cash()->setGatewayName($gateway::getGatewayName());
     }
 
     public function driver(?string $driver = null, array $config = []): AbstractDriver

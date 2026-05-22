@@ -7,4 +7,6 @@ enum PaymentTypeEnum
     case CHARGE;
 
     case RECURRING;
+
+    case CASH;
 }
