@@ -17,9 +17,9 @@ abstract class AbstractWebhook
 
     private ?AbstractDriver $driver = null;
 
-    public function handle(array $allRequestData = []): WebhookResponse
+    public function handle(array $allRequestData = [], array $headers = []): WebhookResponse
     {
-        $data = $this->parseRequestData($allRequestData);
+        $data = $this->parseRequestData($allRequestData, $headers);
 
         $payment = $this->findPayment($data->externId);
 
@@ -73,6 +73,11 @@ abstract class AbstractWebhook
         foreach ($targets as $target) {
             if (method_exists($target, $hookMethod)) {
                 $error = $target->{$hookMethod}($payment, $data, $operation);
+                if ($error instanceof PaymentError) return $error;
+            }
+
+            if (method_exists($target, 'webhookBeforeHandler')) {
+                $error = $target->webhookBeforeHandler($payment, $data, $operation);
                 if ($error instanceof PaymentError) return $error;
             }
         }
@@ -214,5 +219,5 @@ abstract class AbstractWebhook
         return $this->driver;
     }
 
-    abstract function parseRequestData(array $allRequestData = []): WebhookParseData;
+    abstract function parseRequestData(array $allRequestData = [], array $headers = []): WebhookParseData;
 }
