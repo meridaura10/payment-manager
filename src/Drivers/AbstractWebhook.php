@@ -17,8 +17,15 @@ abstract class AbstractWebhook
 
     private ?AbstractDriver $driver = null;
 
+    protected array $allRequestData = [];
+
+    protected array $allRequestHeaders = [];
+
     public function handle(array $allRequestData = [], array $headers = []): WebhookResponse
     {
+        $this->allRequestData = $allRequestData;
+        $this->allRequestHeaders = $headers;
+
         $data = $this->parseRequestData($allRequestData, $headers);
 
         $payment = $this->findPayment($data->externId);
@@ -193,7 +200,6 @@ abstract class AbstractWebhook
     protected function saveWebhookDataOnly(Payment $payment, WebhookParseData $data): void
     {
         $this->repository()->update($payment, [
-            $this->configurator()->getWebhookModifyAtColumName() => $data->modifiedDate,
             $this->configurator()->getWebhookDataColumName() => $data->fullRequestData,
         ]);
     }
